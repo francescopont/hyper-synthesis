@@ -3,6 +3,7 @@ import payntbind
 
 from paynt.parser.prism_parser import PrismParser
 from paynt.parser.pomdp_parser import PomdpParser
+from paynt.parser.prism_hyperparser import PrismHyperParser
 
 import paynt.quotient.models
 
@@ -57,7 +58,7 @@ class Sketch:
 
     @classmethod
     def load_sketch(cls, sketch_path, properties_path,
-        export=None, relative_error=0, discount_factor=1, precision=1e-4, constraint_bound=None):
+        export=None, relative_error=0, discount_factor=1, precision=1e-4, constraint_bound=None, is_hyper=False):
 
         assert discount_factor>0 and discount_factor<=1, "discount factor must be in the interval (0,1]"
         if discount_factor < 1:
@@ -81,10 +82,17 @@ class Sketch:
 
         filetype = None
         try:
-            logger.info(f"assuming sketch in PRISM format...")
-            prism, explicit_quotient, specification, family, coloring, jani_unfolder, obs_evaluator = PrismParser.read_prism(
-                        sketch_path, properties_path, relative_error, discount_factor)
-            filetype = "prism"
+            if is_hyper:
+                logger.info(f"[hyper] assuming sketch in PRISM format...")
+                parser = PrismHyperParser()
+                _, explicit_quotient, specification, family, coloring, _, _ = parser.read_prism(
+                    sketch_path, properties_path, relative_error, discount_factor)
+                filetype = "prism-hyper"
+            else:
+                logger.info(f"assuming sketch in PRISM format...")
+                prism, explicit_quotient, specification, family, coloring, jani_unfolder, obs_evaluator = PrismParser.read_prism(
+                            sketch_path, properties_path, relative_error, discount_factor)
+                filetype = "prism"
         except SyntaxError:
             pass
         if filetype is None:
@@ -139,7 +147,7 @@ class Sketch:
             logger.info("export OK, aborting...")
             exit(0)
 
-        return Sketch.build_quotient_container(prism, jani_unfolder, explicit_quotient, family, coloring, specification, obs_evaluator, decpomdp_manager)
+        return Sketch.build_quotient_container(prism, jani_unfolder, explicit_quotient, family, coloring, specification, obs_evaluator, decpomdp_manager, is_hyper)
     
 
     @classmethod
@@ -213,8 +221,11 @@ class Sketch:
 
 
     @classmethod
-    def build_quotient_container(cls, prism, jani_unfolder, explicit_quotient, family, coloring, specification, obs_evaluator, decpomdp_manager):
-        if jani_unfolder is not None:
+    def build_quotient_container(cls, prism, jani_unfolder, explicit_quotient, family, coloring, specification, obs_evaluator, decpomdp_manager, is_hyper=False):
+        if is_hyper:
+            quotient_container = paynt.quotient.quotient.DtmcFamilyQuotient(explicit_quotient, family, coloring,
+                                                                            specification)
+        elif jani_unfolder is not None:
             if prism.model_type == stormpy.storage.PrismModelType.DTMC:
                 quotient_container = paynt.quotient.quotient.DtmcFamilyQuotient(explicit_quotient, family, coloring, specification)
             elif prism.model_type == stormpy.storage.PrismModelType.MDP:

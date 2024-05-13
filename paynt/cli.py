@@ -138,6 +138,9 @@ def setup_logger(log_path = None):
 @click.option("--profiling", is_flag=True, default=False,
     help="run profiling")
 
+@click.option("--hyper", is_flag=True, default=False,
+    help="the specification contains hyperproperties")
+
 def paynt_run(
     project, sketch, props, relative_error, discount_factor, optimum_threshold, precision,
     export,
@@ -151,7 +154,8 @@ def paynt_run(
     mdp_split_wrt_mdp, mdp_discard_unreachable_choices, mdp_use_randomized_abstraction,
     constraint_bound,
     ce_generator,
-    profiling
+    profiling,
+    hyper
 ):
     profiler = None
     if profiling:
@@ -182,7 +186,7 @@ def paynt_run(
     sketch_path = os.path.join(project, sketch)
     properties_path = os.path.join(project, props)
     if all_in_one is None:
-        quotient = paynt.parser.sketch.Sketch.load_sketch(sketch_path, properties_path, export, relative_error, discount_factor, precision, constraint_bound)
+        quotient = paynt.parser.sketch.Sketch.load_sketch(sketch_path, properties_path, export, relative_error, discount_factor, precision, constraint_bound, hyper)
         synthesizer = paynt.synthesizer.synthesizer.Synthesizer.choose_synthesizer(quotient, method, fsc_synthesis, storm_control)
         synthesizer.run(optimum_threshold, export_evaluation)
     else:
