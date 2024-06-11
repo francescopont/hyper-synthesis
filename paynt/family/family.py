@@ -34,6 +34,9 @@ class Family:
     def hole_name(self, hole):
         return self.hole_to_name[hole]
 
+    def hole_options_strings(self, hole):
+        return self.hole_to_option_labels[hole]
+
     def hole_options(self, hole):
         return self.family.holeOptions(hole)
 

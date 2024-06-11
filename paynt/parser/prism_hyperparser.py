@@ -171,11 +171,13 @@ class PrismHyperParser:
         properties = []
 
         for line in self.lines:
+            print(f"Line: {line}")
             minmax = None
             match = mdp_spec.search(line)
             if match is not None:
                 minmax = match.group(1)
                 line = match.group(2)
+                print(f"Updated line: {line}")
             prop = self.parse_property(line)
             if prop is None:
                 continue
@@ -235,7 +237,7 @@ class PrismHyperParser:
         builder_options = stormpy.BuilderOptions()
         builder_options.set_build_with_choice_origins(True)
         builder_options.set_build_state_valuations(True)
-        builder_options.set_add_overlapping_guards_label()
+        builder_options.set_add_overlapping_guards_label(True)
         builder_options.set_build_observation_valuations(True)
         builder_options.set_build_all_labels(True)
         builder_options.set_build_choice_labels(True)
@@ -252,7 +254,6 @@ class PrismHyperParser:
         nr_replicas = len(self.state_quant_dict)
         state_variables = list(self.state_quant_dict.keys())
         state_to_hole_index = [{} for _ in range(nr_replicas)]
-        hole_index = 0
         for state in single_model.states:
             state_name = single_model.state_valuations.get_string(state.id)
             num_actions = single_model.get_nr_available_actions(state.id)
@@ -264,10 +265,10 @@ class PrismHyperParser:
                     option_labels.append(str(label))
                 state_holes = {}
                 for sched_name in self.sched_quant_dict.keys():
-                    replica_name = state_name + f"{state_name}(sched {sched_name})"
+                    replica_name = f"{state_name}(sched {sched_name})"
+                    hole_index = family.num_holes
                     family.add_hole(replica_name, option_labels)
                     state_holes[sched_name] = hole_index
-                    hole_index += 1
                 for index, (_, sched_name) in enumerate(self.state_quant_dict.values()):
                     state_to_hole_index[index][state.id] = state_holes[sched_name]
 
@@ -316,7 +317,7 @@ class PrismHyperParser:
                 cross_reward_models[cross_name] = stormpy.SparseRewardModel(state_reward)
 
         # generate the transition matrix of the cross-product
-        choice_to_hole_options = [[]]
+        choice_to_hole_options = []
         cross_product_row_counter = 0
         for states_tuple in state_permutations:
             # generate the state in the cross product associated with this tuple
@@ -325,6 +326,7 @@ class PrismHyperParser:
             actions_tuples = product(*actions_lists) # all the actions of the tuple of states
             builder.new_row_group(cross_product_row_counter)
             for actions_tuple in actions_tuples:
+                choice_to_hole_options.append([])
                 transitions_lists = [states[index].actions[id].transitions for index, id in enumerate(actions_tuple)]
                 for (index, action_id) in enumerate(actions_tuple):
                     hole_id = state_to_hole_index[index].get(states_tuple[index], None)
@@ -337,7 +339,8 @@ class PrismHyperParser:
                     value = prod(map(lambda transition: transition.value(), transitions_tuple))
                     builder.add_next_value(cross_product_row_counter, destination, value)
                 cross_product_row_counter += 1
-                choice_to_hole_options.append([])
+
+
 
         product_transition_matrix = builder.build()
         components = stormpy.SparseModelComponents(transition_matrix=product_transition_matrix,
@@ -348,14 +351,92 @@ class PrismHyperParser:
         # build the cross-product (which represent the quotient mdp)
         quotient_mdp = stormpy.storage.SparseMdp(components)
 
+        # actual parsing of the properties
+        logger.info("Checking that we have a single initial state...")
+        assert len(quotient_mdp.initial_states) == 1, f"The self-composed model has {len(quotient_mdp.initial_states)} initial states"
+        logger.info("We have a single initial state now, so no instantiation of the properties will be done")
+        specification = self.parse_specification(relative_error, discount_factor)
+
+        if specification.is_single_property:
+            single_property = specification.stormpy_properties()[0]
+            single_formula = single_property.raw_formula
+            if single_formula.subformula.is_complex_path_formula:
+                logger.info("Generating explicit cross-product due to presence of a complex formula")
+                #generate the cross-product model
+                logger.info(f"Number of states of the self-composition: {quotient_mdp.nr_states}")
+                product_rep  = stormpy.build_product_model(quotient_mdp, single_formula)
+                new_quotient_mdp = product_rep.product_model
+                logger.info(f"Number of states of the cross-product: {new_quotient_mdp.nr_states}")
+                new_quotient_mdp.labeling.add_label("target")
+                new_quotient_mdp.labeling.set_states("target", product_rep.accepting_states)
+
+                new_initial = None
+                assert len(quotient_mdp.initial_states) == 1
+                for ((MDP_state, _), index) in product_rep.product_state_to_product_index.items():
+                    if MDP_state == quotient_mdp.initial_states[0]:
+                        if new_initial is not None:
+                            raise Exception("the cross product has multiple initial states, it is not deterministic")
+                        new_initial = index
+
+                new_quotient_mdp.labeling.add_label("init")
+                new_quotient_mdp.labeling.add_label_to_state("init", new_initial)
+
+                # generate the family and the choice_to_hole_option mapping
+                logger.info("Regenerating the family to adapt to cross-product")
+                new_choice_to_hole_options = []
+
+                product_hole_to_hole_index = {} # this keeps track of whether the new hole with unfolded memory value has been created
+
+                logger.info(f"Current family has {family.num_holes} holes")
+                p_index_to_p_state = product_rep.product_index_to_product_state
+                for state in new_quotient_mdp.states:
+                    num_actions = new_quotient_mdp.get_nr_available_actions(state.id)
+                    if num_actions > 1:
+                        # this state has to be mapped to a hole
+                        (mdp_state, memory_value) = p_index_to_p_state[state.id]
+                        for offset in range(num_actions):
+                            old_choice = quotient_mdp.get_choice_index(mdp_state, offset)
+                            old_choice_hole_options = choice_to_hole_options[old_choice]
+                            hole_options = []
+                            assert old_choice_hole_options
+                            if memory_value == 0:
+                                hole_options = old_choice_hole_options # keep old holes
+                            else:
+                                for (hole_id, action_id) in old_choice_hole_options:
+                                    new_hole_id = product_hole_to_hole_index.get((hole_id, memory_value), None)
+                                    if new_hole_id is None:
+                                        # create a new hole
+                                        new_name = f"{family.hole_name(hole_id)}(memory = {memory_value})"
+                                        option_labels = family.hole_options_strings(hole_id).copy()
+                                        new_hole_id = family.num_holes
+                                        family.add_hole(new_name, option_labels)
+                                        product_hole_to_hole_index[(hole_id, memory_value)] = new_hole_id
+                                    hole_options.append((new_hole_id, action_id))
+                            new_choice_to_hole_options.append(hole_options)
+                    else: new_choice_to_hole_options.append([])
+
+                # refactor the formula
+                logger.info("Refactoring the formula!")
+                rf = str(single_formula)
+                formula_re = re.compile(r'^(.*)\[(.*)\]')
+                match = formula_re.search(rf)
+                if match is None:
+                    raise Exception(f"Formula is not supported: {rf}!")
+                new_rf = f"{match.group(1)}[F \"target\"]\n"
+                print(f"Current saved Lines before overwriting : {self.lines}")
+                print(".....")
+                self.lines = [new_rf]
+                new_specification = self.parse_specification(relative_error, discount_factor)
+
+                # updating the variables
+                quotient_mdp = new_quotient_mdp
+                choice_to_hole_options = new_choice_to_hole_options
+                specification = new_specification
+
         # generating the coloring
+        logger.info("Generating the coloring")
         coloring = payntbind.synthesis.Coloring(family.family, quotient_mdp.nondeterministic_choice_indices,
                                                 choice_to_hole_options)
-
-        # actual parsing of the properties
-        logger.info("Assume we have a single initial state now, so no instantiation of the properties will be done")
-        assert len(quotient_mdp.initial_states) == 1, f"The self-composed model has {len(quotient_mdp.initial_states)} initial states"
-        specification = self.parse_specification(relative_error, discount_factor)
 
         return None, quotient_mdp, specification, family, coloring, None, None
 
