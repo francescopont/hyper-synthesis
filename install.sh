@@ -7,7 +7,7 @@ COMPILE_JOBS=$(nproc)
 
 # environment variables
 PAYNT_ROOT=`pwd`
-PREREQUISITES=${PAYNT_ROOT}/prerequisites # modify this to install prerequisites outside of Paynt
+PREREQUISITES=${PAYNT_ROOT}/../prerequisites # modify this to install prerequisites outside of Paynt
 
 # storm and stormpy dependencies
 sudo apt update -qq
@@ -30,12 +30,12 @@ mkdir -p ${PREREQUISITES}
 
 # build storm
 cd ${PREREQUISITES}
-git clone https://github.com/moves-rwth/storm.git storm
+git clone https://github.com/francescopont/storm.git storm
 # git clone --branch stable https://github.com/moves-rwth/storm.git storm
 mkdir -p ${PREREQUISITES}/storm/build
 cd ${PREREQUISITES}/storm/build
 cmake ..
-make storm-main storm-pomdp storm-dft --jobs ${COMPILE_JOBS}
+make storm-main storm-pomdp storm-dft --jobs 8
 # make check --jobs ${COMPILE_JOBS}
 
 # setup and activate python environment
@@ -52,7 +52,7 @@ python3 setup.py develop
 
 # build stormpy
 cd ${PREREQUISITES}
-git clone https://github.com/moves-rwth/stormpy.git stormpy
+git clone git@github.com:francescopont/stormpy.git stormpy
 # git clone --branch stable https://github.com/moves-rwth/stormpy.git stormpy
 cd ${PREREQUISITES}/stormpy
 python3 setup.py develop
