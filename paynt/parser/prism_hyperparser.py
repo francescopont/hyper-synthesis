@@ -171,13 +171,11 @@ class PrismHyperParser:
         properties = []
 
         for line in self.lines:
-            print(f"Line: {line}")
             minmax = None
             match = mdp_spec.search(line)
             if match is not None:
                 minmax = match.group(1)
                 line = match.group(2)
-                print(f"Updated line: {line}")
             prop = self.parse_property(line)
             if prop is None:
                 continue
@@ -249,7 +247,8 @@ class PrismHyperParser:
         nr_states = single_model.nr_states
         logger.info(f"The original (non self-composed) model has {nr_initial_states} initial states and {nr_states} states")
 
-        # generate the family of parameters
+        # generate the family of holes (aka parameters, schedulers' choices...)
+        logger.info(f"Generating the family...")
         family = paynt.family.family.Family()
         nr_replicas = len(self.state_quant_dict)
         state_variables = list(self.state_quant_dict.keys())
@@ -271,13 +270,15 @@ class PrismHyperParser:
                     state_holes[sched_name] = hole_index
                 for index, (_, sched_name) in enumerate(self.state_quant_dict.values()):
                     state_to_hole_index[index][state.id] = state_holes[sched_name]
+        logger.info(f"Current family has {family.num_holes} holes")
 
-        # generate the state set of the cross-product
+        # generate the state set of the self-composition
         state_permutations = list(product(range(nr_states), repeat= nr_replicas))
         builder = stormpy.SparseMatrixBuilder(rows=0,columns=0, entries=0, force_dimensions=False,
                                               has_custom_row_grouping=True, row_groups=0)
 
-        # generate the labelings of the cross-product
+        # generate the labelings of the self-composition
+        logger.info("Generating the labels of the self-composition")
         cross_state_labeling = stormpy.storage.StateLabeling(len(state_permutations))
         for label in single_model.labeling.get_labels():
             if label == 'deadlock':
@@ -305,7 +306,8 @@ class PrismHyperParser:
                                                    stormpy.BitVector(len(state_permutations),
                                                                      [i for i,tup in enumerate(state_permutations)
                                                                       if tup[index] in affected_states]))
-        # generate the reward models of the cross-product
+        # generate the reward models of the self-composition
+        logger.info(f"Generating the reward model of the self-composition")
         cross_reward_models = {}
         for name, reward_model in single_model.reward_models.items():
             assert reward_model.has_state_rewards
@@ -316,7 +318,8 @@ class PrismHyperParser:
                 cross_name = name + state_variable
                 cross_reward_models[cross_name] = stormpy.SparseRewardModel(state_reward)
 
-        # generate the transition matrix of the cross-product
+        # generate the transition matrix of the self-composition
+        logger.info(f"generating the transition system of the self-composition")
         choice_to_hole_options = []
         cross_product_row_counter = 0
         for states_tuple in state_permutations:
@@ -348,13 +351,14 @@ class PrismHyperParser:
                                                    reward_models=cross_reward_models,
                                                    rate_transitions=False)
 
-        # build the cross-product (which represent the quotient mdp)
+        # build the self-composition (which is the quotient mdp)
         quotient_mdp = stormpy.storage.SparseMdp(components)
+        logger.info(f"Number of states of the self-composition: {quotient_mdp.nr_states}")
 
         # actual parsing of the properties
         logger.info("Checking that we have a single initial state...")
         assert len(quotient_mdp.initial_states) == 1, f"The self-composed model has {len(quotient_mdp.initial_states)} initial states"
-        logger.info("We have a single initial state now, so no instantiation of the properties will be done")
+        logger.info("We have a single initial state now, so no instantiation of the state quantifications will be done")
         specification = self.parse_specification(relative_error, discount_factor)
 
         if specification.is_single_property:
@@ -363,7 +367,6 @@ class PrismHyperParser:
             if single_formula.subformula.is_complex_path_formula:
                 logger.info("Generating explicit cross-product due to presence of a complex formula")
                 #generate the cross-product model
-                logger.info(f"Number of states of the self-composition: {quotient_mdp.nr_states}")
                 product_rep  = stormpy.build_product_model(quotient_mdp, single_formula)
                 new_quotient_mdp = product_rep.product_model
                 logger.info(f"Number of states of the cross-product: {new_quotient_mdp.nr_states}")
@@ -382,12 +385,11 @@ class PrismHyperParser:
                 new_quotient_mdp.labeling.add_label_to_state("init", new_initial)
 
                 # generate the family and the choice_to_hole_option mapping
-                logger.info("Regenerating the family to adapt to cross-product")
+                logger.info("Regenerating the family and the choice-to-hole-options to adapt to cross-product")
                 new_choice_to_hole_options = []
 
                 product_hole_to_hole_index = {} # this keeps track of whether the new hole with unfolded memory value has been created
 
-                logger.info(f"Current family has {family.num_holes} holes")
                 p_index_to_p_state = product_rep.product_index_to_product_state
                 for state in new_quotient_mdp.states:
                     num_actions = new_quotient_mdp.get_nr_available_actions(state.id)
@@ -414,6 +416,7 @@ class PrismHyperParser:
                                     hole_options.append((new_hole_id, action_id))
                             new_choice_to_hole_options.append(hole_options)
                     else: new_choice_to_hole_options.append([])
+                logger.info(f"The updated family has {family.num_holes} holes")
 
                 # refactor the formula
                 logger.info("Refactoring the formula!")
@@ -423,8 +426,6 @@ class PrismHyperParser:
                 if match is None:
                     raise Exception(f"Formula is not supported: {rf}!")
                 new_rf = f"{match.group(1)}[F \"target\"]\n"
-                print(f"Current saved Lines before overwriting : {self.lines}")
-                print(".....")
                 self.lines = [new_rf]
                 new_specification = self.parse_specification(relative_error, discount_factor)
 
