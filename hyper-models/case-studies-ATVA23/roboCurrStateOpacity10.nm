@@ -1,0 +1,37 @@
+mdp
+
+const int N = 10;
+const double error = 0.1;
+
+module robot
+	x:  [0..N-1];
+	y:  [0..N-1];
+	act:[0..4] ; // 0: initial, 1: down, 2: up, 3: right, 4: left;
+	
+	[left]   x>0   & !((x-1>1)&(x-1<N-2)&(mod(y,4)=0 | mod(y,4)=1)) -> 1-error : (x'=x-1)&(act'=4)  + error : (x'=x)&(act'=4) ;
+	[right]  x<N-1 & !((x+1>1)&(x+1<N-2)&(mod(y,4)=0 | mod(y,4)=1)) -> 1-error : (x'=x+1)&(act'=3)  + error : (x'=x)&(act'=3) ;
+	[up]     y<N-1 & !((x>1)&(x<N-2)&(mod(y+1,4)=0 | mod(y+1,4)=1)) -> 1-error : (y'=y+1)&(act'=2)  + error : (y'=y)&(act'=2) ;
+	[down]   y>0   & !((x>1)&(x<N-2)&(mod(y-1,4)=0 | mod(y-1,4)=1)) -> 1-error : (y'=y-1)&(act'=1)  + error : (y'=y)&(act'=1) ;
+endmodule
+
+init (x=0 & y>=0 & y<2 & act=0) endinit
+
+label "start0" = (x=0 & y=0 & act=0);
+label "start1" = (x=0 & y=1 & act=0);
+
+label "obstacle" = (x>1)&(x< N-2)&(mod(y,4)=0 | mod(y,4)=1);
+label "goal" = (x=N-1)&(y>=N-2)&(y<N);
+
+// in the initial region
+label "class_0" = (x>=0)&(x<2)&(y>=0)&(y<N);
+// in between obstacles region
+label "class_1" = (x>=2)&(x<N-2)&(mod(y,4)!=0 & mod(y,4)!=1);
+// near goal region
+label "class_2" = (x>=N-2)&(x<N)&(y>=0)&(y<N);
+
+
+label "act0" = act=0;
+label "act1" = act=1;
+label "act2" = act=2;
+label "act3" = act=3;
+label "act4" = act=4;
