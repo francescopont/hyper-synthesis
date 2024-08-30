@@ -41,7 +41,7 @@ make storm-main storm-pomdp storm-dft --jobs 8
 # setup and activate python environment
 python3 -m venv ${PREREQUISITES}/venv
 source ${PREREQUISITES}/venv/bin/activate
-pip3 install wheel
+pip3 install wheel setuptools
 
 # build pycarl
 cd ${PREREQUISITES}
