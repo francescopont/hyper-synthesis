@@ -385,10 +385,8 @@ class PrismHyperParser:
                 new_quotient_mdp.labeling.add_label_to_state("init", new_initial)
 
                 # generate the family and the choice_to_hole_option mapping
-                logger.info("Regenerating the family and the choice-to-hole-options to adapt to cross-product")
+                logger.info("Regenerating choice-to-hole-options to adapt to cross-product - family does not change")
                 new_choice_to_hole_options = []
-
-                product_hole_to_hole_index = {} # this keeps track of whether the new hole with unfolded memory value has been created
 
                 p_index_to_p_state = product_rep.product_index_to_product_state
                 for state in new_quotient_mdp.states:
@@ -399,24 +397,9 @@ class PrismHyperParser:
                         for offset in range(num_actions):
                             old_choice = quotient_mdp.get_choice_index(mdp_state, offset)
                             old_choice_hole_options = choice_to_hole_options[old_choice]
-                            hole_options = []
                             assert old_choice_hole_options
-                            if memory_value == 0:
-                                hole_options = old_choice_hole_options # keep old holes
-                            else:
-                                for (hole_id, action_id) in old_choice_hole_options:
-                                    new_hole_id = product_hole_to_hole_index.get((hole_id, memory_value), None)
-                                    if new_hole_id is None:
-                                        # create a new hole
-                                        new_name = f"{family.hole_name(hole_id)}(memory = {memory_value})"
-                                        option_labels = family.hole_options_strings(hole_id).copy()
-                                        new_hole_id = family.num_holes
-                                        family.add_hole(new_name, option_labels)
-                                        product_hole_to_hole_index[(hole_id, memory_value)] = new_hole_id
-                                    hole_options.append((new_hole_id, action_id))
-                            new_choice_to_hole_options.append(hole_options)
+                            new_choice_to_hole_options.append(old_choice_hole_options)
                     else: new_choice_to_hole_options.append([])
-                logger.info(f"The updated family has {family.num_holes} holes")
 
                 # refactor the formula
                 logger.info("Refactoring the formula!")
