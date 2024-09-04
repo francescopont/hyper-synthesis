@@ -379,17 +379,6 @@ class PrismHyperParser:
         new_quotient_mdp.labeling.add_label("target")
         new_quotient_mdp.labeling.set_states("target", product_rep.accepting_states)
 
-        new_initial = None
-        assert len(quotient_mdp.initial_states) == 1
-        for ((MDP_state, _), index) in product_rep.product_state_to_product_index.items():
-            if MDP_state == quotient_mdp.initial_states[0]:
-                if new_initial is not None:
-                    raise Exception("the cross product has multiple initial states, it is not deterministic")
-                new_initial = index
-
-        new_quotient_mdp.labeling.add_label("init")
-        new_quotient_mdp.labeling.add_label_to_state("init", new_initial)
-
         # generate the family and the choice_to_hole_option mapping
         logger.info("Regenerating choice-to-hole-options to adapt to cross-product - family does not change")
         new_choice_to_hole_options = []
@@ -398,10 +387,17 @@ class PrismHyperParser:
         product_choice_to_actions_tuple = []
 
         p_index_to_p_state = product_rep.product_index_to_product_state
+        assert len(quotient_mdp.initial_states) == 1
         for state in new_quotient_mdp.states:
             num_actions = new_quotient_mdp.get_nr_available_actions(state.id)
             # this state has to be mapped to a hole
             (mdp_state, sA) = p_index_to_p_state[state.id]
+
+            # assigning the initial state
+            if mdp_state == quotient_mdp.initial_states[0]:
+                logger.info("Setting the initial state of the cross-product")
+                new_quotient_mdp.labeling.add_label("init")
+                new_quotient_mdp.labeling.add_label_to_state("init", state.id)
 
             for offset in range(num_actions):
                 old_choice = quotient_mdp.get_choice_index(mdp_state, offset)
