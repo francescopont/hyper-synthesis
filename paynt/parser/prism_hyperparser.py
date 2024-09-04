@@ -357,7 +357,7 @@ class PrismHyperParser:
                                                    reward_models=cross_reward_models,
                                                    rate_transitions=False)
 
-        # build the self-composition (which is the quotient mdp)
+        # build the self-composition
         quotient_mdp = stormpy.storage.SparseMdp(components)
         logger.info(f"Number of states of the self-composition: {quotient_mdp.nr_states}")
 
@@ -379,30 +379,28 @@ class PrismHyperParser:
         new_quotient_mdp.labeling.add_label("target")
         new_quotient_mdp.labeling.set_states("target", product_rep.accepting_states)
 
+        # resetting the initial state
+        assert new_quotient_mdp.labeling.contains_label("soi")
+        initial_states = list(new_quotient_mdp.labeling.get_states("soi"))
+        assert len(initial_states) == 1
+        new_quotient_mdp.labeling.add_label("init")
+        new_quotient_mdp.labeling.add_label_to_state("init", initial_states[0])
+
         # generate the family and the choice_to_hole_option mapping
         logger.info("Regenerating choice-to-hole-options to adapt to cross-product - family does not change")
         new_choice_to_hole_options = []
-
-        # to export to Inf-JESP
-        product_choice_to_actions_tuple = []
+        product_choice_to_actions_tuple = [] # to export to Inf-JESP
 
         p_index_to_p_state = product_rep.product_index_to_product_state
         assert len(quotient_mdp.initial_states) == 1
         for state in new_quotient_mdp.states:
             num_actions = new_quotient_mdp.get_nr_available_actions(state.id)
-            # this state has to be mapped to a hole
             (mdp_state, sA) = p_index_to_p_state[state.id]
-
-            # assigning the initial state
-            if mdp_state == quotient_mdp.initial_states[0]:
-                logger.info("Setting the initial state of the cross-product")
-                new_quotient_mdp.labeling.add_label("init")
-                new_quotient_mdp.labeling.add_label_to_state("init", state.id)
 
             for offset in range(num_actions):
                 old_choice = quotient_mdp.get_choice_index(mdp_state, offset)
                 old_choice_hole_options = choice_to_hole_options[old_choice]
-                if num_actions > 1:
+                if num_actions > 1: # this state has to be mapped to a hole
                     assert old_choice_hole_options
                     old_actions_tuple = list(cross_choice_to_actions_tuple[old_choice])
                     old_actions_tuple.append(0)
