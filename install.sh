@@ -52,7 +52,7 @@ python3 setup.py develop
 
 # build stormpy
 cd ${PREREQUISITES}
-git clone git@github.com:francescopont/stormpy.git stormpy
+git clone https://github.com/francescopont/stormpy.git stormpy
 # git clone --branch stable https://github.com/moves-rwth/stormpy.git stormpy
 cd ${PREREQUISITES}/stormpy
 python3 setup.py develop
