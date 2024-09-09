@@ -350,7 +350,8 @@ class PrismHyperParser:
                     builder.add_next_value(cross_product_row_counter, destination, value)
                 cross_product_row_counter += 1
 
-
+        choice_to_action_tuple = cross_choice_to_actions_tuple
+        index_to_product_state = cross_index_to_cross_state
         product_transition_matrix = builder.build()
         components = stormpy.SparseModelComponents(transition_matrix=product_transition_matrix,
                                                    state_labeling=cross_state_labeling,
@@ -371,6 +372,8 @@ class PrismHyperParser:
         assert specification.is_single_property
         single_property = specification.stormpy_properties()[0]
         single_formula = single_property.raw_formula
+
+        # TODO: exclude Eventually formulae from here
         logger.info("Generating explicit cross-product due to presence of a complex formula")
         #generate the cross-product model
         product_rep  = stormpy.build_product_model(quotient_mdp, single_formula)
@@ -425,6 +428,8 @@ class PrismHyperParser:
         quotient_mdp = new_quotient_mdp
         choice_to_hole_options = new_choice_to_hole_options
         specification = new_specification
+        choice_to_action_tuple = product_choice_to_actions_tuple
+        index_to_product_state = list(map(lambda tup: tuple(list(cross_index_to_cross_state[tup[0]]) + [tup[1]]), p_index_to_p_state))
 
         # export the build model
         export = True
@@ -433,7 +438,7 @@ class PrismHyperParser:
             with open("helpers.json", "w") as file:
                 helpers = {}
                 # state labeling
-                state_components = list(map(lambda tup: tuple(list(cross_index_to_cross_state[tup[0]]) + [tup[1]]), p_index_to_p_state))
+                state_components = index_to_product_state
                 #print(f"State components: {state_components}")
                 helpers["state labeling"] = state_components
 
@@ -443,10 +448,12 @@ class PrismHyperParser:
 
                 # product choice to action tuple
                 # print(f"Product choice to action tuple: {product_choice_to_actions_tuple}")
-                helpers["choice labeling"] = product_choice_to_actions_tuple
+                helpers["choice labeling"] = choice_to_action_tuple
 
                 json.dump(helpers, file)
 
+        if export:
+            raise Exception("Exporting a model causes abortion of the synthesis process")
         # generating the coloring
         logger.info("Generating the coloring")
         coloring = payntbind.synthesis.Coloring(family.family, quotient_mdp.nondeterministic_choice_indices,
