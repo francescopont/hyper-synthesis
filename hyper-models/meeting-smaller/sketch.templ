@@ -38,7 +38,7 @@ module maze
         [le] !sink & left   -> 0.9: (x'=xl) + 0.1: (y'=yu);
 endmodule
 
-const double discount_factor = 0.90;
+const double discount_factor = 0.95;
 module discounting
         sink : bool;
         [up] true -> discount_factor : true + 1-discount_factor : (sink'=true);
