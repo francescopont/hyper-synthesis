@@ -146,7 +146,7 @@ class MdpSpecificationResult(SpecificationResult):
         if opt is not None: 
             self.improving_assignment = opt.improving_assignment
             self.improving_value = opt.improving_value
-            self.can_improve = opt.improving_value is None and opt.can_improve
+            self.can_improve = opt.can_improve
         else:
             self.can_improve = True
 

@@ -206,8 +206,17 @@ class MDP(MarkovChain):
             result.can_improve = False
             return result
 
-        if not MDP.compute_secondary_direction:
+        # try to bring the scheduler inside the family
+        consistent_selection = [[options[0]] for options in result.primary_selection]
+        improving_assignment = self.design_space.assume_options_copy(consistent_selection)
+        improving_assignment, improving_value = self.quotient_container.double_check_assignment(improving_assignment)
+        if improving_value is not None:
+            result.improving_assignment = improving_assignment
             result.can_improve = True
+            return result
+
+        if not MDP.compute_secondary_direction:
+            result.can_improve = result.primary.sat
             return result
 
         # UB might improve the optimum

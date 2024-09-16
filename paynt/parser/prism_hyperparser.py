@@ -373,88 +373,85 @@ class PrismHyperParser:
         single_property = specification.stormpy_properties()[0]
         single_formula = single_property.raw_formula
 
-        export = False
-        if export or not single_formula.subformula.is_eventually_formula:
-            logger.info("Generating explicit cross-product due to presence of a complex formula")
-            #generate the cross-product model
-            product_rep  = stormpy.build_product_model(quotient_mdp, single_formula)
-            new_quotient_mdp = product_rep.product_model
-            logger.info(f"Number of states of the cross-product: {new_quotient_mdp.nr_states}")
-            new_quotient_mdp.labeling.add_label("target")
-            new_quotient_mdp.labeling.set_states("target", product_rep.accepting_states)
+        logger.info("Generating explicit cross-product due to presence of a complex formula")
+        #generate the cross-product model
+        product_rep  = stormpy.build_product_model(quotient_mdp, single_formula)
+        new_quotient_mdp = product_rep.product_model
+        logger.info(f"Number of states of the cross-product: {new_quotient_mdp.nr_states}")
+        new_quotient_mdp.labeling.add_label("target")
+        new_quotient_mdp.labeling.set_states("target", product_rep.accepting_states)
 
-            # resetting the initial state
-            assert new_quotient_mdp.labeling.contains_label("soi")
-            initial_states = list(new_quotient_mdp.labeling.get_states("soi"))
-            assert len(initial_states) == 1
-            new_quotient_mdp.labeling.add_label("init")
-            new_quotient_mdp.labeling.add_label_to_state("init", initial_states[0])
+        # resetting the initial state
+        assert new_quotient_mdp.labeling.contains_label("soi")
+        initial_states = list(new_quotient_mdp.labeling.get_states("soi"))
+        assert len(initial_states) == 1
+        new_quotient_mdp.labeling.add_label("init")
+        new_quotient_mdp.labeling.add_label_to_state("init", initial_states[0])
 
-            # generate the family and the choice_to_hole_option mapping
-            logger.info("Regenerating choice-to-hole-options to adapt to cross-product - family does not change")
-            new_choice_to_hole_options = []
-            product_choice_to_actions_tuple = [] # to export to Inf-JESP
+        # generate the family and the choice_to_hole_option mapping
+        logger.info("Regenerating choice-to-hole-options to adapt to cross-product - family does not change")
+        new_choice_to_hole_options = []
+        product_choice_to_actions_tuple = [] # to export to Inf-JESP
 
-            p_index_to_p_state = product_rep.product_index_to_product_state
-            assert len(quotient_mdp.initial_states) == 1
-            for state in new_quotient_mdp.states:
-                num_actions = new_quotient_mdp.get_nr_available_actions(state.id)
-                (mdp_state, sA) = p_index_to_p_state[state.id]
+        p_index_to_p_state = product_rep.product_index_to_product_state
+        assert len(quotient_mdp.initial_states) == 1
+        for state in new_quotient_mdp.states:
+            num_actions = new_quotient_mdp.get_nr_available_actions(state.id)
+            (mdp_state, sA) = p_index_to_p_state[state.id]
 
-                for offset in range(num_actions):
-                    old_choice = quotient_mdp.get_choice_index(mdp_state, offset)
-                    old_choice_hole_options = choice_to_hole_options[old_choice]
-                    if num_actions > 1: # this state has to be mapped to a hole
-                        assert old_choice_hole_options
-                        old_actions_tuple = list(cross_choice_to_actions_tuple[old_choice])
-                        old_actions_tuple.append(0)
-                        product_choice_to_actions_tuple.append(tuple(old_actions_tuple))
-                    else:
-                        assert not old_choice_hole_options
-                        product_choice_to_actions_tuple.append(tuple([0 for _ in range(nr_replicas +1)]))
-                    new_choice_to_hole_options.append(old_choice_hole_options)
+            for offset in range(num_actions):
+                old_choice = quotient_mdp.get_choice_index(mdp_state, offset)
+                old_choice_hole_options = choice_to_hole_options[old_choice]
+                if num_actions > 1: # this state has to be mapped to a hole
+                    assert old_choice_hole_options
+                    old_actions_tuple = list(cross_choice_to_actions_tuple[old_choice])
+                    old_actions_tuple.append(0)
+                    product_choice_to_actions_tuple.append(tuple(old_actions_tuple))
+                else:
+                    assert not old_choice_hole_options
+                    product_choice_to_actions_tuple.append(tuple([0 for _ in range(nr_replicas +1)]))
+                new_choice_to_hole_options.append(old_choice_hole_options)
 
-            # refactor the formula
-            logger.info("Refactoring the formula!")
-            rf = str(single_formula)
-            formula_re = re.compile(r'^(.*)\[(.*)\]')
-            match = formula_re.search(rf)
-            if match is None:
-                raise Exception(f"Formula is not supported: {rf}!")
-            new_rf = f"{match.group(1)}[F \"target\"]\n"
-            self.lines = [new_rf]
-            new_specification = self.parse_specification(relative_error, discount_factor)
+        # refactor the formula
+        logger.info("Refactoring the formula!")
+        rf = str(single_formula)
+        formula_re = re.compile(r'^(.*)\[(.*)\]')
+        match = formula_re.search(rf)
+        if match is None:
+            raise Exception(f"Formula is not supported: {rf}!")
+        new_rf = f"{match.group(1)}[F \"target\"]\n"
+        self.lines = [new_rf]
+        new_specification = self.parse_specification(relative_error, discount_factor)
 
-            # updating the variables
-            quotient_mdp = new_quotient_mdp
-            choice_to_hole_options = new_choice_to_hole_options
-            specification = new_specification
-            choice_to_action_tuple = product_choice_to_actions_tuple
-            index_to_product_state = list(map(lambda tup: tuple(list(cross_index_to_cross_state[tup[0]]) + [tup[1]]), p_index_to_p_state))
+        # updating the variables
+        quotient_mdp = new_quotient_mdp
+        choice_to_hole_options = new_choice_to_hole_options
+        specification = new_specification
+        choice_to_action_tuple = product_choice_to_actions_tuple
+        index_to_product_state = list(map(lambda tup: tuple(list(cross_index_to_cross_state[tup[0]]) + [tup[1]]), p_index_to_p_state))
 
-            # export the build model
-            sketch_folder = sketch_path.replace("sketch.templ", "")
-            if export:
-                stormpy.export_to_drn(quotient_mdp, f"{sketch_folder}/model.drn")
-                with open(f"{sketch_folder}/helpers.json", "w") as file:
-                    helpers = {}
-                    # state labeling
-                    state_components = index_to_product_state
-                    #print(f"State components: {state_components}")
-                    helpers["state labeling"] = state_components
+        # export the build model
+        sketch_folder = sketch_path.replace("sketch.templ", "")
+        export = True
+        if export:
+            stormpy.export_to_drn(quotient_mdp, f"{sketch_folder}/model.drn")
+            with open(f"{sketch_folder}/helpers.json", "w") as file:
+                helpers = {}
+                # state labeling
+                state_components = index_to_product_state
+                #print(f"State components: {state_components}")
+                helpers["state labeling"] = state_components
 
-                    # accepting states of the full model
-                    #print(f"Target states as string: {list(quotient_mdp.labeling.get_states('target'))}")
-                    helpers["target states"] = list(quotient_mdp.labeling.get_states('target'))
+                # accepting states of the full model
+                #print(f"Target states as string: {list(quotient_mdp.labeling.get_states('target'))}")
+                helpers["target states"] = list(quotient_mdp.labeling.get_states('target'))
 
-                    # product choice to action tuple
-                    # print(f"Product choice to action tuple: {product_choice_to_actions_tuple}")
-                    helpers["choice labeling"] = choice_to_action_tuple
+                # product choice to action tuple
+                # print(f"Product choice to action tuple: {product_choice_to_actions_tuple}")
+                helpers["choice labeling"] = choice_to_action_tuple
 
-                    json.dump(helpers, file)
+                json.dump(helpers, file)
 
-            if export:
-                raise Exception("Exporting a model causes abortion of the synthesis process")
         # generating the coloring
         logger.info("Generating the coloring")
         coloring = payntbind.synthesis.Coloring(family.family, quotient_mdp.nondeterministic_choice_indices,
