@@ -282,12 +282,16 @@ class PrismHyperParser:
         logger.info("Generating the labels of the self-composition")
         cross_state_labeling = stormpy.storage.StateLabeling(len(state_permutations))
         for label in single_model.labeling.get_labels():
+            assert not label == 'soi', "Soi is a reserved label unfortunately"
             if label == 'deadlock':
+                # do nothing
+                '''
                 states = list(single_model.labeling.get_states(label))
                 affected_states = list(map(lambda tup: self.state_map(tup, nr_states), product(states, repeat=nr_replicas)))
                 cross_state_labeling.add_label(label)
                 cross_state_labeling.set_states(label,
                                                 stormpy.BitVector(len(state_permutations), affected_states))
+                '''
             if label == 'init':
                 states = list(single_model.labeling.get_states(label))
                 affected_states_tuples = list(product(states, repeat=nr_replicas))
@@ -308,6 +312,7 @@ class PrismHyperParser:
                                                                      [i for i,tup in enumerate(state_permutations)
                                                                       if tup[index] in affected_states]))
         # generate the reward models of the self-composition
+        '''
         logger.info(f"Generating the reward model of the self-composition")
         cross_reward_models = {}
         for name, reward_model in single_model.reward_models.items():
@@ -318,6 +323,7 @@ class PrismHyperParser:
                 state_reward = [reward_model.get_state_reward(state_tuple[index]) for state_tuple in state_permutations]
                 cross_name = name + state_variable
                 cross_reward_models[cross_name] = stormpy.SparseRewardModel(state_reward)
+        '''
 
         # generate the transition matrix of the self-composition
         logger.info(f"generating the transition system of the self-composition")
@@ -356,7 +362,7 @@ class PrismHyperParser:
         product_transition_matrix = builder.build()
         components = stormpy.SparseModelComponents(transition_matrix=product_transition_matrix,
                                                    state_labeling=cross_state_labeling,
-                                                   reward_models=cross_reward_models,
+                                                   #reward_models=cross_reward_models,
                                                    rate_transitions=False)
 
         # build the self-composition
@@ -369,72 +375,94 @@ class PrismHyperParser:
         logger.info("We have a single initial state now, so no instantiation of the state quantifications will be done")
         specification = self.parse_specification(relative_error, discount_factor)
 
-        # TODO: add support for multiple properties
-        assert specification.is_single_property
-        single_property = specification.stormpy_properties()[0]
-        single_formula = single_property.raw_formula
+        target_sets = {}
+        can_export = len(specification.stormpy_properties()) == 1
+        for index, property in enumerate(specification.stormpy_properties()):
+            formula = property.raw_formula
 
-        logger.info("Generating explicit cross-product due to presence of a complex formula")
-        #generate the cross-product model
-        product_rep  = stormpy.build_product_model(quotient_mdp, single_formula)
-        new_quotient_mdp = product_rep.product_model
-        logger.info(f"Number of states of the cross-product: {new_quotient_mdp.nr_states}")
-        new_quotient_mdp.labeling.add_label("target")
-        new_quotient_mdp.labeling.set_states("target", product_rep.accepting_states)
+            logger.info(f"Generating explicit cross-product for formula: {formula}")
+            #generate the cross-product model
+            product_rep  = stormpy.build_product_model(quotient_mdp, formula)
+            new_quotient_mdp = product_rep.product_model
+            logger.info(f"Number of states of the cross-product: {new_quotient_mdp.nr_states}")
 
-        # resetting the initial state
-        assert new_quotient_mdp.labeling.contains_label("soi")
-        initial_states = list(new_quotient_mdp.labeling.get_states("soi"))
-        assert len(initial_states) == 1
-        new_quotient_mdp.labeling.add_label("init")
-        new_quotient_mdp.labeling.add_label_to_state("init", initial_states[0])
+            new_target_sets = {}
+            p_index_to_p_state = product_rep.product_index_to_product_state
+            for label in quotient_mdp.labeling.get_labels():
+                if not (label == 'soi'):
+                    new_quotient_mdp.labeling.add_label(label)
+            for p_index, (mdp_state, sA) in enumerate(p_index_to_p_state):
+                if target_sets:
+                    new_target_sets[p_index] = target_sets.get(mdp_state, [])
+                if not can_export:
+                    labels = quotient_mdp.labeling.get_labels_of_state(mdp_state)
+                    for label in labels:
+                        if not (label == 'init'):
+                            new_quotient_mdp.labeling.add_label_to_state(label, p_index)
 
-        # generate the family and the choice_to_hole_option mapping
-        logger.info("Regenerating choice-to-hole-options to adapt to cross-product - family does not change")
-        new_choice_to_hole_options = []
-        product_choice_to_actions_tuple = [] # to export to Inf-JESP
+            for accepting_state in list(product_rep.accepting_states):
+                new_target_sets[accepting_state] = new_target_sets.get(accepting_state, []) + [index]
+            target_sets = new_target_sets
 
-        p_index_to_p_state = product_rep.product_index_to_product_state
-        assert len(quotient_mdp.initial_states) == 1
-        for state in new_quotient_mdp.states:
-            num_actions = new_quotient_mdp.get_nr_available_actions(state.id)
-            (mdp_state, sA) = p_index_to_p_state[state.id]
+            # resetting the initial state
+            assert new_quotient_mdp.labeling.contains_label("soi")
+            initial_states = list(new_quotient_mdp.labeling.get_states("soi"))
+            assert len(initial_states) == 1
+            new_quotient_mdp.labeling.add_label_to_state("init", initial_states[0])
 
-            for offset in range(num_actions):
-                old_choice = quotient_mdp.get_choice_index(mdp_state, offset)
-                old_choice_hole_options = choice_to_hole_options[old_choice]
-                if num_actions > 1: # this state has to be mapped to a hole
-                    assert old_choice_hole_options
-                    old_actions_tuple = list(cross_choice_to_actions_tuple[old_choice])
-                    old_actions_tuple.append(0)
-                    product_choice_to_actions_tuple.append(tuple(old_actions_tuple))
-                else:
-                    assert not old_choice_hole_options
-                    product_choice_to_actions_tuple.append(tuple([0 for _ in range(nr_replicas +1)]))
-                new_choice_to_hole_options.append(old_choice_hole_options)
+            # generate the family and the choice_to_hole_option mapping
+            logger.info("Regenerating choice-to-hole-options to adapt to cross-product - family does not change")
+            new_choice_to_hole_options = []
+            product_choice_to_actions_tuple = [] # to export to Inf-JESP
 
-        # refactor the formula
-        logger.info("Refactoring the formula!")
-        rf = str(single_formula)
-        formula_re = re.compile(r'^(.*)\[(.*)\]')
-        match = formula_re.search(rf)
-        if match is None:
-            raise Exception(f"Formula is not supported: {rf}!")
-        new_rf = f"{match.group(1)}[F \"target\"]\n"
-        self.lines = [new_rf]
-        new_specification = self.parse_specification(relative_error, discount_factor)
+            for state in new_quotient_mdp.states:
+                num_actions = new_quotient_mdp.get_nr_available_actions(state.id)
+                (mdp_state, sA) = p_index_to_p_state[state.id]
 
-        # updating the variables
-        quotient_mdp = new_quotient_mdp
-        choice_to_hole_options = new_choice_to_hole_options
-        specification = new_specification
-        choice_to_action_tuple = product_choice_to_actions_tuple
-        index_to_product_state = list(map(lambda tup: tuple(list(cross_index_to_cross_state[tup[0]]) + [tup[1]]), p_index_to_p_state))
+                for offset in range(num_actions):
+                    old_choice = quotient_mdp.get_choice_index(mdp_state, offset)
+                    old_choice_hole_options = choice_to_hole_options[old_choice]
+                    if can_export:
+                        if num_actions > 1: # this state has to be mapped to a hole
+                            assert old_choice_hole_options
+                            old_actions_tuple = list(cross_choice_to_actions_tuple[old_choice])
+                            old_actions_tuple.append(0)
+                            product_choice_to_actions_tuple.append(tuple(old_actions_tuple))
+                        else:
+                            assert not old_choice_hole_options
+                            product_choice_to_actions_tuple.append(tuple([0 for _ in range(nr_replicas +1)]))
+                    new_choice_to_hole_options.append(old_choice_hole_options)
 
+            # updating the variables
+            quotient_mdp = new_quotient_mdp
+            choice_to_hole_options = new_choice_to_hole_options
+            if can_export:
+                choice_to_action_tuple = product_choice_to_actions_tuple
+                index_to_product_state = list(
+                    map(lambda tup: tuple(list(cross_index_to_cross_state[tup[0]]) + [tup[1]]), p_index_to_p_state))
+
+        self.lines = []
+        for index, property in enumerate(specification.stormpy_properties()):
+            # refactor the formula
+            formula = property.raw_formula
+            logger.info(f"Refactoring formula: {formula}")
+            rf = str(formula)
+            formula_re = re.compile(r'^(.*)\[(.*)\]')
+            match = formula_re.search(rf)
+            if match is None:
+                raise Exception(f"Formula is not supported: {rf}!")
+            new_rf = f"{match.group(1)}[F \"target{index}\"]\n"
+            self.lines.append(new_rf)
+
+            target_states = [state for state, targetFormulas in target_sets.items() if index in targetFormulas]
+            quotient_mdp.labeling.add_label(f"target{index}")
+            quotient_mdp.labeling.set_states(f"target{index}", stormpy.BitVector(quotient_mdp.nr_states, target_states))
+
+        specification = self.parse_specification(relative_error, discount_factor)
         # export the build model
         sketch_folder = sketch_path.replace("sketch.templ", "")
-        export = True
-        if export:
+        want_to_export = False
+        if can_export and want_to_export:
             file_name = f"{sketch_folder}/model.drn"
             zipped_file_name = f"{sketch_folder}/model.zip"
             stormpy.export_to_drn(quotient_mdp, file_name)
@@ -445,15 +473,12 @@ class PrismHyperParser:
                 helpers = {}
                 # state labeling
                 state_components = index_to_product_state
-                #print(f"State components: {state_components}")
                 helpers["state labeling"] = state_components
 
                 # accepting states of the full model
-                #print(f"Target states as string: {list(quotient_mdp.labeling.get_states('target'))}")
-                helpers["target states"] = list(quotient_mdp.labeling.get_states('target'))
+                helpers["target states"] = list(quotient_mdp.labeling.get_states('target0'))
 
                 # product choice to action tuple
-                # print(f"Product choice to action tuple: {product_choice_to_actions_tuple}")
                 helpers["choice labeling"] = choice_to_action_tuple
 
                 json.dump(helpers, file)
