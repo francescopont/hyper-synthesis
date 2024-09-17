@@ -1,4 +1,0 @@
-ES sched0 ES sched1
-A s0(sched0) A s1(sched1)
-Restrict s0 start0 Restrict s1 start1
-Pmax=? [(!"stops0" & !"stops1" &  !("treasure0s0" | "treasure1s1")) U ("treasure0s0" & "treasure1s1")]
