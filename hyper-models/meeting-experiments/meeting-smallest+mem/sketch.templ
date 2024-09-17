@@ -71,9 +71,7 @@ formula t0 = (x=2&y=1);
 formula t1 = (x=2&y=2);
 
 
-label "treasure0" = (t0);
-label "treasure1" = (t1);
-
+label "treasure" = (t0 | t1);
 label "stop" = (sink);
 label "start0" = (x=x0_init & y=y0_init);
 label "start1" = (x=x1_init & y=y1_init);
