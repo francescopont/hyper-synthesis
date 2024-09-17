@@ -12,6 +12,7 @@ import os
 import re
 import json
 import logging
+import zipfile
 
 logger = logging.getLogger(__name__)
 
@@ -434,7 +435,12 @@ class PrismHyperParser:
         sketch_folder = sketch_path.replace("sketch.templ", "")
         export = True
         if export:
-            stormpy.export_to_drn(quotient_mdp, f"{sketch_folder}/model.drn")
+            file_name = f"{sketch_folder}/model.drn"
+            zipped_file_name = f"{sketch_folder}/model.zip"
+            stormpy.export_to_drn(quotient_mdp, file_name)
+            zipfile.ZipFile(zipped_file_name, mode='w').write(file_name)
+            os.remove(file_name)
+
             with open(f"{sketch_folder}/helpers.json", "w") as file:
                 helpers = {}
                 # state labeling
