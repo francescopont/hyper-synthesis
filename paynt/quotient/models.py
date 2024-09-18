@@ -240,5 +240,7 @@ class MDP(MarkovChain):
         constraints_result, optimality_result = super().check_specification(specification,constraint_indices,short_evaluation)
         if optimality_result is not None and optimality_result.improving_assignment is not None and double_check:
             optimality_result.improving_assignment, optimality_result.improving_value = self.quotient_container.double_check_assignment(optimality_result.improving_assignment)
+            if optimality_result.improving_assignment is None:
+                optimality_result.can_improve = True
             # print(optimality_result.improving_assignment, optimality_result.improving_value)
         return MdpSpecificationResult(constraints_result, optimality_result)
