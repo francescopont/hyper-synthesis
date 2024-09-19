@@ -86,7 +86,7 @@ class Sketch:
                 logger.info(f"[hyper] assuming sketch in PRISM format...")
                 parser = PrismHyperParser()
                 _, explicit_quotient, specification, family, coloring, _, _ = parser.read_prism(
-                    sketch_path, properties_path, relative_error, discount_factor)
+                    sketch_path, properties_path, relative_error, discount_factor, export)
                 filetype = "prism-hyper"
             else:
                 logger.info(f"assuming sketch in PRISM format...")
@@ -142,7 +142,7 @@ class Sketch:
         specification.transform_until_to_eventually()
         logger.info(f"found the following specification {specification}")
 
-        if export is not None:
+        if (export is not None) and (not is_hyper):
             Sketch.export(export, sketch_path, jani_unfolder, explicit_quotient)
             logger.info("export OK, aborting...")
             exit(0)

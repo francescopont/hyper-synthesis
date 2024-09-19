@@ -206,7 +206,7 @@ class PrismHyperParser:
             return acc + tup[0]
         else:
             return self.state_map(tup[1:], state_count, acc + (tup[0] * (state_count ** (len(tup) -1))))
-    def read_prism(self, sketch_path, properties_path, relative_error, discount_factor):
+    def read_prism(self, sketch_path, properties_path, relative_error, discount_factor, export=None):
 
         # loading the specification file
         logger.info(f"Loading properties from {properties_path} ...")
@@ -377,8 +377,11 @@ class PrismHyperParser:
 
         target_sets = {}
         single_property = len(specification.stormpy_properties()) == 1
+        assert (export is None) or (export is "drn"), "can export hypermodels only in zipped drn format for the moment"
+        want_to_export = export is not None
+        assert not (want_to_export and not single_property), "cannot export a model with multiple properties"
         for index, property in enumerate(specification.stormpy_properties()):
-            if not property.raw_formula.subformula.is_eventually_formula:
+            if (not property.raw_formula.subformula.is_eventually_formula) or want_to_export:
                 formula = property.raw_formula
 
                 logger.info(f"Generating explicit cross-product for formula: {formula}")
@@ -437,7 +440,7 @@ class PrismHyperParser:
                 # updating the variables
                 quotient_mdp = new_quotient_mdp
                 choice_to_hole_options = new_choice_to_hole_options
-                if single_property:
+                if want_to_export:
                     choice_to_action_tuple = product_choice_to_actions_tuple
                     index_to_product_state = list(
                         map(lambda tup: tuple(list(cross_index_to_cross_state[tup[0]]) + [tup[1]]), p_index_to_p_state))
@@ -453,7 +456,7 @@ class PrismHyperParser:
                 match = formula_re.search(rf)
                 if match is None:
                     raise Exception(f"Formula is not supported: {rf}!")
-                if not property.raw_formula.subformula.is_eventually_formula:
+                if not property.raw_formula.subformula.is_eventually_formula or want_to_export:
                     new_rf = f"{match.group(1)}[F \"target{index}\"]\n"
                     target_states = [state for state, targetFormulas in target_sets.items() if index in targetFormulas]
                     quotient_mdp.labeling.add_label(f"target{index}")
@@ -467,7 +470,6 @@ class PrismHyperParser:
         specification = self.parse_specification(relative_error, discount_factor)
         # export the build model
         sketch_folder = sketch_path.replace("sketch.templ", "")
-        want_to_export = False
         if single_property and want_to_export:
             file_name = f"{sketch_folder}/model.drn"
             zipped_file_name = f"{sketch_folder}/model.zip"
@@ -488,6 +490,9 @@ class PrismHyperParser:
                 helpers["choice labeling"] = choice_to_action_tuple
 
                 json.dump(helpers, file)
+
+            logger.info("hyperExport OK, aborting...")
+            exit(0)
 
         # generating the coloring
         logger.info("Generating the coloring")
