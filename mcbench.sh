@@ -43,8 +43,8 @@ function paynt() {
 }
 
 # empty the current content of the log file
-rm -rf $log_dir
-mkdir $log_dir
+#rm -rf $log_dir
+#mkdir $log_dir
 touch $log_file
 
 cwd=$(pwd)
