@@ -1,9 +1,26 @@
 #!/bin/bash
 
-# example: bash mcbench.sh ar hyper-models/meeting-experiments
+# example: bash mcbench.sh ar hyper-models/meeting-experiments mylog.txt
 method="ar"
 if [ -n "$1" ]; then
   method=$1
+fi
+
+projects_dir="./eval"
+if [ -n "$2" ]; then
+  projects_dir="$2"
+fi
+
+log_dir="./logs"
+file_name="log.txt"
+if [ -n "$3" ]; then
+  file_name="$3"
+fi
+log_file="${log_dir}/${file_name}"
+
+param=''
+if [ -n "$4" ]; then
+  param="$4"
 fi
 
 # default parameters
@@ -12,18 +29,6 @@ timeout=3600
 # workspace settings
 SYNTHESIS=`pwd`
 paynt_exe="./paynt.py"
-projects_dir="./eval"
-log_dir="./logs"
-log_file="${log_dir}/log.txt"
-
-if [ -n "$2" ]; then
-  projects_dir="$2"
-fi
-
-param=''
-if [ -n "$3" ]; then
-  param="$3"
-fi
 
 # ------------------------------------------------------------------------------
 # functions
