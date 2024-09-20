@@ -22,7 +22,7 @@ const int x0_init = 0;
 const int y0_init = 0;
 
 const int x1_init = 0;
-const int y1_init = 1;
+const int y1_init = 6;
 
 formula yu = up ? (y+1) : y;
 formula xr = right ? (x+1) : x;
@@ -32,12 +32,10 @@ formula xl = left ? (x-1) : x;
 module maze
          x : [0..11];
          y : [0..6];
-         act:[0..4] ; // 0: initial, 1: down, 2: up, 3: right, 4: left;
-
-        [up] !sink & up   -> 0.9: (y'=yu) & (act'=2) + 0.1: (x'=xr) & (act' = 2);
-        [ri] !sink & right   -> 0.9: (x'=xr) & (act' = 3) + 0.1: (y'=yd) & (act' = 3);
-        [do] !sink & down   -> 0.9: (y'=yd) & (act' = 1) + 0.1: (x'=xl) & (act' = 1);
-        [le] !sink & left   -> 0.9: (x'=xl) & (act' = 4) + 0.1: (y'=yu) & (act' = 4);
+        [up] !sink & up   -> 0.9: (y'=yu) + 0.1: (x'=xr);
+        [ri] !sink & right   -> 0.9: (x'=xr) + 0.1: (y'=yd);
+        [do] !sink & down   -> 0.9: (y'=yd) + 0.1: (x'=xl);
+        [le] !sink & left   -> 0.9: (x'=xl) + 0.1: (y'=yu);
 endmodule
 
 const double discount_factor = 0.98;
@@ -49,27 +47,15 @@ module discounting
         [le] true -> discount_factor : true + 1-discount_factor : (sink'=true);
 endmodule
 
-init (((x=x0_init & y=y0_init) | (x=x1_init & y=y1_init)) & !sink & act=0) endinit
+init (((x=x0_init & y=y0_init) | (x=x1_init & y=y1_init)) & !sink) endinit
 
 formula t0 = (x=3&y=0);
 formula t1 = (x=8&y=2);
 formula t2 = (x=2&y=3);
 
 label "treasure" = (t0 | t1 | t2);
-
-// in the initial region
-label "class0" = (x=0 | y>4);
-// middle region
-label "class1" = (x=1&y<=4) | (y=4&x>=1);
-// goal region
-label "class2" = (x>1&y<4);
-
 label "stop" = (sink);
+label "goal" = (t0 | t1| t2) & !sink;
+
 label "start0" = (x=x0_init & y=y0_init);
 label "start1" = (x=x1_init & y=y1_init);
-
-label "act0" = act=0;
-label "act1" = act=1;
-label "act2" = act=2;
-label "act3" = act=3;
-label "act4" = act=4;
