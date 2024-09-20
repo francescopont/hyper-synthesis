@@ -1,0 +1,91 @@
+mdp
+//  4 | .... .
+//  3 |   t  .
+//  2 | ........t
+//  1 | . . .   .
+//  0 | i .t. ......
+//    --------------
+//      ............
+
+formula up = (x=0&y=0)|(x=2&y=0)|(x=0&y=1)|(x=1&y=1)|(x=2&y=1)|(x=3&y=1)|(x=2&y=2);
+
+formula right = (x=1&y=0)|(x=2&y=0)|(x=1&y=1)|(x=0&y=2)|(x=1&y=2)|(x=2&y=2)|(x=1&y=3);
+
+formula down = (x=0&y=1)|(x=2&y=1)|(x=3&y=1)|(x=0&y=2)|(x=2&y=2)|(x=0&y=3)|(x=1&y=3)|(x=2&y=3)|(x=3&y=3);
+
+formula left = (x=1&y=0)|(x=3&y=0)|(x=1&y=1)|(x=3&y=1)|(x=1&y=2)|(x=2&y=2)|(x=3&y=2)|(x=3&y=3);
+
+const int x0_init = 0;
+const int y0_init = 0;
+
+const int x1_init = 0;
+const int y1_init = 1;
+
+formula yu = up ? (y+1) : y;
+formula xr = right ? (x+1) : x;
+formula yd = down ? (y-1) : y;
+formula xl = left ? (x-1) : x;
+
+module maze
+         x : [0..3];
+         y : [0..3];
+         act:[0..4] ; // 0: initial, 1: down, 2: up, 3: right, 4: left;
+
+        [up0] !sink & up   -> 0.9: (y'=yu) & (act'=2) + 0.1: (x'=xr) & (act' = 2);
+        [ri0] !sink & right   -> 0.9: (x'=xr) & (act' = 3) + 0.1: (y'=yd) & (act' = 3);
+        [do0] !sink & down   -> 0.9: (y'=yd) & (act' = 1) + 0.1: (x'=xl) & (act' = 1);
+        [le0] !sink & left   -> 0.9: (x'=xl) & (act' = 4) + 0.1: (y'=yu) & (act' = 4);
+
+        [up1] !sink & up   -> 0.9: (y'=yu) & (act'=2) + 0.1: (x'=xr) & (act' = 2);
+        [ri1] !sink & right   -> 0.9: (x'=xr) & (act' = 3) + 0.1: (y'=yd) & (act' = 3);
+        [do1] !sink & down   -> 0.9: (y'=yd) & (act' = 1) + 0.1: (x'=xl) & (act' = 1);
+        [le1] !sink & left   -> 0.9: (x'=xl) & (act' = 4) + 0.1: (y'=yu) & (act' = 4);
+endmodule
+
+const double discount_factor = 0.98;
+module discounting
+        sink : bool;
+        [up0] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+        [ri0] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+        [do0] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+        [le0] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+        [up1] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+        [ri1] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+        [do1] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+        [le1] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+endmodule
+
+module memory
+        memory : [0..1];
+        [up0] true -> (memory'=0);
+        [up1] true -> (memory'=1);
+        [ri0] true -> (memory'=0);
+        [ri1] true -> (memory'=1);
+        [do0] true -> (memory'=0);
+        [do1] true -> (memory'=1);
+        [le0] true -> (memory'=0);
+        [le1] true -> (memory'=1);
+endmodule
+
+init (((x=x0_init & y=y0_init) | (x=x1_init & y=y1_init)) & !sink & act=0 & memory=0) endinit
+
+formula t0 = (x=2&y=1);
+formula t1 = (x=2&y=2);
+
+// in the initial region
+label "class0" = (x=0);
+// in between obstacles region
+label "class1" = (x=1);
+// near goal region
+label "class2" = (x>1);
+
+label "treasure" = (t0 | t1);
+label "stop" = (sink);
+label "start0" = (x=x0_init & y=y0_init);
+label "start1" = (x=x1_init & y=y1_init);
+
+label "act0" = act=0;
+label "act1" = act=1;
+label "act2" = act=2;
+label "act3" = act=3;
+label "act4" = act=4;

@@ -1,0 +1,3 @@
+ES sched0 ES sched1
+A s0(sched0) A s1(sched1)
+Pmax=? [(G (("act0s0" & "act0s1") | ("act1s0" & "act1s1")  | ("act2s0" & "act2s1") | ("act3s0" & "act3s1") | ("act4s0" & "act4s1"))) &  ((((!"goalR1s0") U "goalR2s0") & (!((!"goalR1s1") U "goalR2s1"))) | (((!"goalR1s1") U "goalR2s1") & (!((!"goalR1s0") U "goalR2s0"))))]
