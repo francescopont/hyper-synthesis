@@ -377,7 +377,7 @@ class PrismHyperParser:
 
         target_sets = {}
         single_property = len(specification.stormpy_properties()) == 1
-        assert (export is None) or (export is "drn"), "can export hypermodels only in zipped drn format for the moment"
+        assert (export is None) or (export == "drn"), "can export hypermodels only in zipped drn format for the moment"
         want_to_export = export is not None
         assert not (want_to_export and not single_property), "cannot export a model with multiple properties"
         for index, property in enumerate(specification.stormpy_properties()):
