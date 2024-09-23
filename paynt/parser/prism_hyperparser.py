@@ -312,7 +312,6 @@ class PrismHyperParser:
                                                                      [i for i,tup in enumerate(state_permutations)
                                                                       if tup[index] in affected_states]))
         # generate the reward models of the self-composition
-        '''
         logger.info(f"Generating the reward model of the self-composition")
         cross_reward_models = {}
         for name, reward_model in single_model.reward_models.items():
@@ -323,7 +322,6 @@ class PrismHyperParser:
                 state_reward = [reward_model.get_state_reward(state_tuple[index]) for state_tuple in state_permutations]
                 cross_name = name + state_variable
                 cross_reward_models[cross_name] = stormpy.SparseRewardModel(state_reward)
-        '''
 
         # generate the transition matrix of the self-composition
         logger.info(f"generating the transition system of the self-composition")
@@ -362,7 +360,7 @@ class PrismHyperParser:
         product_transition_matrix = builder.build()
         components = stormpy.SparseModelComponents(transition_matrix=product_transition_matrix,
                                                    state_labeling=cross_state_labeling,
-                                                   #reward_models=cross_reward_models,
+                                                   reward_models=cross_reward_models,
                                                    rate_transitions=False)
 
         # build the self-composition
