@@ -378,7 +378,7 @@ class PrismHyperParser:
                     cross_state_labeling.set_states(cross_label,
                                                     stormpy.BitVector(nr_cross_states,
                                                                       [state_map[tup] for tup in
-                                                                       state_map if tup[index] in affected_states]))
+                                                                       state_map if tup[index] in affected_states and state_map[tup] != deadlock_state]))
 
         choice_to_action_tuple = cross_choice_to_actions_tuple
         index_to_product_state = cross_index_to_cross_state
