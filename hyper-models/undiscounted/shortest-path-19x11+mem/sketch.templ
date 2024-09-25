@@ -36,27 +36,14 @@ formula xl = left   ? (x-1) : x;
 module maze
 	 x : [0..18];
 	 y : [0..10];
-	[up0] !sink & up     -> 0.9: (y'=yu) + 0.1: (x'=xr);
-	[ri0] !sink & right  -> 0.9: (x'=xr) + 0.1: (y'=yd);
-	[do0] !sink & down   -> 0.9: (y'=yd) + 0.1: (x'=xl);
-	[le0] !sink & left   -> 0.9: (x'=xl) + 0.1: (y'=yu);
-	[up1] !sink & up     -> 0.9: (y'=yu) + 0.1: (x'=xr);
-	[ri1] !sink & right  -> 0.9: (x'=xr) + 0.1: (y'=yd);
-	[do1] !sink & down   -> 0.9: (y'=yd) + 0.1: (x'=xl);
-	[le1] !sink & left   -> 0.9: (x'=xl) + 0.1: (y'=yu);
-endmodule
-
-const double discount_factor = 0.98;
-module discounting
-	sink : bool;
-	[up0] true -> discount_factor : true + 1-discount_factor : (sink'=true);
-	[ri0] true -> discount_factor : true + 1-discount_factor : (sink'=true);
-	[do0] true -> discount_factor : true + 1-discount_factor : (sink'=true);
-	[le0] true -> discount_factor : true + 1-discount_factor : (sink'=true);
-	[up1] true -> discount_factor : true + 1-discount_factor : (sink'=true);
-	[ri1] true -> discount_factor : true + 1-discount_factor : (sink'=true);
-	[do1] true -> discount_factor : true + 1-discount_factor : (sink'=true);
-	[le1] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+	[up0] up     -> 0.9: (y'=yu) + 0.1: (x'=xr);
+	[ri0] right  -> 0.9: (x'=xr) + 0.1: (y'=yd);
+	[do0] down   -> 0.9: (y'=yd) + 0.1: (x'=xl);
+	[le0] left   -> 0.9: (x'=xl) + 0.1: (y'=yu);
+	[up1] up     -> 0.9: (y'=yu) + 0.1: (x'=xr);
+	[ri1] right  -> 0.9: (x'=xr) + 0.1: (y'=yd);
+	[do1] down   -> 0.9: (y'=yd) + 0.1: (x'=xl);
+	[le1] left   -> 0.9: (x'=xl) + 0.1: (y'=yu);
 endmodule
 
 module memory
@@ -95,7 +82,7 @@ module success
 endmodule
 
 
-init (((x=x0_init & y=y0_init) | (x=x1_init & y=y1_init)) & !sink & memory=0 & !succ) endinit
+init (((x=x0_init & y=y0_init) | (x=x1_init & y=y1_init)) & memory=0 & !succ) endinit
 
 formula t0 = (x=2&y=0);
 formula t1 = (x=17&y=1);
@@ -104,7 +91,6 @@ formula t3 = (x=1&y=10);
 formula t4 = (x=14&y=10);
 
 label "treasure" = (t0 | t1 | t2 | t3 | t4);
-label "stop" = (sink);
 label "succeeded" = (succ);
 label "start0" = (x=x0_init & y=y0_init);
 label "start1" = (x=x1_init & y=y1_init);
