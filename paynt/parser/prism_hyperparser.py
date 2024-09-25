@@ -201,7 +201,7 @@ class PrismHyperParser:
         assert not specification.has_double_optimality, "did not expect double-optimality property"
         return specification
 
-    def read_prism(self, sketch_path, properties_path, relative_error, discount_factor, export=None):
+    def read_prism(self, sketch_path, properties_path, relative_error, discount_factor, collapse_sink, export):
 
         # loading the specification file
         logger.info(f"Loading properties from {properties_path} ...")
@@ -287,12 +287,14 @@ class PrismHyperParser:
         state_map = {}
         deadlock_state = None # the only one we are allowing
         for states_tuple in state_permutations:
-            states = list(map(lambda id: single_model.states[id], states_tuple))
-            isDeadlock = any(map(lambda state: single_model.labeling.has_state_label('stop', state), states))
+            isDeadlock = False
+            if collapse_sink:
+                states = list(map(lambda id: single_model.states[id], states_tuple))
+                isDeadlock = any(map(lambda state: single_model.labeling.has_state_label('stop', state), states))
             if not isDeadlock or deadlock_state is None:
                 # register this state
                 state_map[states_tuple] = freshId
-                if deadlock_state is None:
+                if isDeadlock:
                     deadlock_state = freshId
                 freshId += 1
 
@@ -350,7 +352,7 @@ class PrismHyperParser:
                 cross_state_labeling.set_states(label,
                                                 stormpy.BitVector(len(state_permutations), affected_states))
                 '''
-            elif label == 'stop':
+            elif label == 'stop' and collapse_sink:
                 for index, state_variable in enumerate(state_variables):
                     cross_label = label + state_variable
                     cross_state_labeling.add_label(cross_label)

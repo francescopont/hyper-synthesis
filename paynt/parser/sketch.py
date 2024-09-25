@@ -58,7 +58,7 @@ class Sketch:
 
     @classmethod
     def load_sketch(cls, sketch_path, properties_path,
-        export=None, relative_error=0, discount_factor=1, precision=1e-4, constraint_bound=None, is_hyper=False):
+        export=None, relative_error=0, discount_factor=1, precision=1e-4, constraint_bound=None, is_hyper=False, collapse_sink=False):
 
         assert discount_factor>0 and discount_factor<=1, "discount factor must be in the interval (0,1]"
         if discount_factor < 1:
@@ -86,7 +86,7 @@ class Sketch:
                 logger.info(f"[hyper] assuming sketch in PRISM format...")
                 parser = PrismHyperParser()
                 _, explicit_quotient, specification, family, coloring, _, _ = parser.read_prism(
-                    sketch_path, properties_path, relative_error, discount_factor, export)
+                    sketch_path, properties_path, relative_error, discount_factor, collapse_sink, export)
                 filetype = "prism-hyper"
             else:
                 logger.info(f"assuming sketch in PRISM format...")
