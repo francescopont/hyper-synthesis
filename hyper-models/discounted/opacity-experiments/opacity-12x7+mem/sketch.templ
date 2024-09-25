@@ -34,15 +34,15 @@ module maze
          y : [0..6];
          act:[0..4] ; // 0: initial, 1: down, 2: up, 3: right, 4: left;
 
-        [up0] !sink & up   -> 0.9: (y'=yu) & (act'=2) + 0.1: (x'=xr) & (act' = 2);
-        [ri0] !sink & right   -> 0.9: (x'=xr) & (act' = 3) + 0.1: (y'=yd) & (act' = 3);
-        [do0] !sink & down   -> 0.9: (y'=yd) & (act' = 1) + 0.1: (x'=xl) & (act' = 1);
-        [le0] !sink & left   -> 0.9: (x'=xl) & (act' = 4) + 0.1: (y'=yu) & (act' = 4);
+        [up0] !sink & up   -> 0.9: (y'=yu) & (act'=2) + 0.1: (x'=xr) & (act' = 3);
+        [ri0] !sink & right   -> 0.9: (x'=xr) & (act' = 3) + 0.1: (y'=yd) & (act' = 1);
+        [do0] !sink & down   -> 0.9: (y'=yd) & (act' = 1) + 0.1: (x'=xl) & (act' = 4);
+        [le0] !sink & left   -> 0.9: (x'=xl) & (act' = 4) + 0.1: (y'=yu) & (act' = 2);
 
-        [up1] !sink & up   -> 0.9: (y'=yu) & (act'=2) + 0.1: (x'=xr) & (act' = 2);
-        [ri1] !sink & right   -> 0.9: (x'=xr) & (act' = 3) + 0.1: (y'=yd) & (act' = 3);
-        [do1] !sink & down   -> 0.9: (y'=yd) & (act' = 1) + 0.1: (x'=xl) & (act' = 1);
-        [le1] !sink & left   -> 0.9: (x'=xl) & (act' = 4) + 0.1: (y'=yu) & (act' = 4);
+        [up1] !sink & up   -> 0.9: (y'=yu) & (act'=2) + 0.1: (x'=xr) & (act' = 3);
+        [ri1] !sink & right   -> 0.9: (x'=xr) & (act' = 3) + 0.1: (y'=yd) & (act' = 1);
+        [do1] !sink & down   -> 0.9: (y'=yd) & (act' = 1) + 0.1: (x'=xl) & (act' = 4);
+        [le1] !sink & left   -> 0.9: (x'=xl) & (act' = 4) + 0.1: (y'=yu) & (act' = 2);
 endmodule
 
 const double discount_factor = 0.98;

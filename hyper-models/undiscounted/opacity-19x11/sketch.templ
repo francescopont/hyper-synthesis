@@ -38,10 +38,10 @@ module maze
 	 y : [0..10];
      act:[0..4] ; // 0: initial, 1: down, 2: up, 3: right, 4: left;
 
-    [up] up   -> 0.9: (y'=yu) & (act'=2) + 0.1: (x'=xr) & (act' = 2);
-    [ri] right   -> 0.9: (x'=xr) & (act' = 3) + 0.1: (y'=yd) & (act' = 3);
-    [do] down   -> 0.9: (y'=yd) & (act' = 1) + 0.1: (x'=xl) & (act' = 1);
-    [le] left   -> 0.9: (x'=xl) & (act' = 4) + 0.1: (y'=yu) & (act' = 4);
+    [up] up     -> 0.9: (y'=yu) & (act'=2) + 0.1: (x'=xr) & (act' = 3);
+    [ri] right  -> 0.9: (x'=xr) & (act' = 3) + 0.1: (y'=yd) & (act' = 1);
+    [do] down   -> 0.9: (y'=yd) & (act' = 1) + 0.1: (x'=xl) & (act' = 4);
+    [le] left   -> 0.9: (x'=xl) & (act' = 4) + 0.1: (y'=yu) & (act' = 2);
 endmodule
 
 init (((x=x0_init & y=y0_init) | (x=x1_init & y=y1_init)) & act=0) endinit
