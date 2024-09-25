@@ -327,7 +327,7 @@ class PrismHyperParser:
                             destination_tuple = tuple(map(lambda transition: transition.column, transitions_tuple))
                             destination = state_map.get(destination_tuple, None)
                             value = prod(map(lambda transition: transition.value(), transitions_tuple))
-                            if destination is None:
+                            if destination is None or destination == deadlock_state:
                                 deadlock_prob += value
                             else:
                                 builder.add_next_value(cross_product_row_counter, destination, value)
