@@ -141,9 +141,6 @@ def setup_logger(log_path = None):
 @click.option("--hyper", is_flag=True, default=False,
     help="the specification contains hyperproperties")
 
-@click.option("--collapse_sink", is_flag=True, default=False,
-    help="collapse sink states in hyperproperties")
-
 def paynt_run(
     project, sketch, props, relative_error, discount_factor, optimum_threshold, precision,
     export,

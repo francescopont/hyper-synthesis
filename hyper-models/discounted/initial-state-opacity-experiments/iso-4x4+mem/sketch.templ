@@ -40,17 +40,19 @@ module maze
         [le1] !sink & left   -> 0.9: (x'=xl) + 0.1: (y'=yu);
 endmodule
 
-const double discount_factor = 0.98;
+const double discount_factor_up = 0.98;
+const double discount_factor_ri = 0.96;
 module discounting
         sink : bool;
-        [up0] true -> discount_factor : true + 1-discount_factor : (sink'=true);
-        [ri0] true -> discount_factor : true + 1-discount_factor : (sink'=true);
-        [do0] true -> discount_factor : true + 1-discount_factor : (sink'=true);
-        [le0] true -> discount_factor : true + 1-discount_factor : (sink'=true);
-        [up1] true -> discount_factor : true + 1-discount_factor : (sink'=true);
-        [ri1] true -> discount_factor : true + 1-discount_factor : (sink'=true);
-        [do1] true -> discount_factor : true + 1-discount_factor : (sink'=true);
-        [le1] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+        [up0] true -> discount_factor_up : true + 1-discount_factor_up : (sink'=true);
+        [ri0] true -> discount_factor_ri : true + 1-discount_factor_ri : (sink'=true);
+        [do0] true -> discount_factor_up : true + 1-discount_factor_up : (sink'=true);
+        [le0] true -> discount_factor_ri : true + 1-discount_factor_ri : (sink'=true);
+
+        [up1] true -> discount_factor_up : true + 1-discount_factor_up : (sink'=true);
+        [ri1] true -> discount_factor_ri : true + 1-discount_factor_ri : (sink'=true);
+        [do1] true -> discount_factor_up : true + 1-discount_factor_up : (sink'=true);
+        [le1] true -> discount_factor_ri : true + 1-discount_factor_ri : (sink'=true);
 endmodule
 
 module memory
@@ -72,6 +74,6 @@ formula t1 = (x=2&y=2);
 
 
 label "treasure" = (t0 | t1);
-label "stop" = (sink);
+label "sink" = (sink);
 label "start0" = (x=x0_init & y=y0_init);
 label "start1" = (x=x1_init & y=y1_init);

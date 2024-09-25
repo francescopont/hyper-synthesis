@@ -42,13 +42,14 @@ module maze
 	[le] !sink & left   -> 0.9: (x'=xl) + 0.1: (y'=yu);
 endmodule
 
-const double discount_factor = 0.98;
+const double discount_factor_up = 0.98;
+const double discount_factor_ri = 0.96;
 module discounting
-	sink : bool;
-	[up] true -> discount_factor : true + 1-discount_factor : (sink'=true);
-	[ri] true -> discount_factor : true + 1-discount_factor : (sink'=true);
-	[do] true -> discount_factor : true + 1-discount_factor : (sink'=true);
-	[le] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+        sink : bool;
+        [up] true -> discount_factor_up : true + 1-discount_factor_up : (sink'=true);
+        [ri] true -> discount_factor_ri : true + 1-discount_factor_ri : (sink'=true);
+        [do] true -> discount_factor_up : true + 1-discount_factor_up : (sink'=true);
+        [le] true -> discount_factor_ri : true + 1-discount_factor_ri : (sink'=true);
 endmodule
 
 init (((x=x0_init & y=y0_init) | (x=x1_init & y=y1_init)) & !sink) endinit
@@ -60,6 +61,6 @@ formula t3 = (x=1&y=10);
 formula t4 = (x=14&y=10);
 
 label "treasure" = (t0 | t1 | t2 | t3 | t4);
-label "stop" = (sink);
+label "sink" = (sink);
 label "start0" = (x=x0_init & y=y0_init);
 label "start1" = (x=x1_init & y=y1_init);

@@ -288,7 +288,7 @@ class PrismHyperParser:
         deadlock_state = None # the only one we are allowing
         for states_tuple in state_permutations:
             states = list(map(lambda id: single_model.states[id], states_tuple))
-            isDeadlock = any(map(lambda state: single_model.labeling.has_state_label('stop', state), states))
+            isDeadlock = single_model.labeling.contains_label('stop') and any(map(lambda state: single_model.labeling.has_state_label('stop', state), states))
             if not isDeadlock or deadlock_state is None:
                 # register this state
                 state_map[states_tuple] = freshId
