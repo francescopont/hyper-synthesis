@@ -159,7 +159,6 @@ def paynt_run(
     ce_generator,
     profiling,
     hyper,
-    collapse_sink
 ):
     profiler = None
     if profiling:
@@ -190,7 +189,7 @@ def paynt_run(
     sketch_path = os.path.join(project, sketch)
     properties_path = os.path.join(project, props)
     if all_in_one is None:
-        quotient = paynt.parser.sketch.Sketch.load_sketch(sketch_path, properties_path, export, relative_error, discount_factor, precision, constraint_bound, hyper, collapse_sink)
+        quotient = paynt.parser.sketch.Sketch.load_sketch(sketch_path, properties_path, export, relative_error, discount_factor, precision, constraint_bound, hyper)
         synthesizer = paynt.synthesizer.synthesizer.Synthesizer.choose_synthesizer(quotient, method, fsc_synthesis, storm_control)
         synthesizer.run(optimum_threshold, export_evaluation)
     else:
