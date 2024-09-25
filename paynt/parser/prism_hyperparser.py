@@ -298,10 +298,10 @@ class PrismHyperParser:
 
         for states_tuple in state_permutations:
             # generate the state in the cross product associated with this tuple
-            cross_index_to_cross_state.append(states_tuple)
             states = list(map(lambda id: single_model.states[id], states_tuple))
             cross_state = state_map.get(states_tuple, None)
             if cross_state is not None:
+                cross_index_to_cross_state.append(states_tuple)
                 if cross_state == deadlock_state: # the deadlock state goes to itself
                     builder.new_row_group(cross_product_row_counter)
                     choice_to_hole_options.append([])
@@ -350,7 +350,14 @@ class PrismHyperParser:
                 cross_state_labeling.set_states(label,
                                                 stormpy.BitVector(len(state_permutations), affected_states))
                 '''
-            if label == 'init':
+            elif label == 'stop':
+                for index, state_variable in enumerate(state_variables):
+                    cross_label = label + state_variable
+                    cross_state_labeling.add_label(cross_label)
+                    cross_state_labeling.set_states(cross_label,
+                                                    stormpy.BitVector(nr_cross_states, [deadlock_state]))
+
+            elif label == 'init':
                 states = list(single_model.labeling.get_states(label))
                 affected_states_tuples = list(product(states, repeat=nr_replicas))
                 filtered_state_tuples = list(filter(
@@ -369,8 +376,7 @@ class PrismHyperParser:
                     cross_state_labeling.set_states(cross_label,
                                                     stormpy.BitVector(nr_cross_states,
                                                                       [state_map[tup] for tup in
-                                                                       state_permutations
-                                                                       if tup[index] in affected_states and tup in state_map]))
+                                                                       state_map if tup[index] in affected_states]))
 
         choice_to_action_tuple = cross_choice_to_actions_tuple
         index_to_product_state = cross_index_to_cross_state
@@ -390,6 +396,7 @@ class PrismHyperParser:
         logger.info("We have a single initial state now, so no instantiation of the state quantifications will be done")
         specification = self.parse_specification(relative_error, discount_factor)
 
+        # constructing the cross-product(s) with the automata for the formulae
         target_sets = {}
         single_property = len(specification.stormpy_properties()) == 1
         assert (export is None) or (export == "drn"), "can export hypermodels only in zipped drn format for the moment"
