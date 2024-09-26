@@ -53,15 +53,15 @@ endmodule
 
 module success
     succ : bool;
-    [up] (t0 | t1) -> (succ'=true);
-    [ri] (t0 | t1) -> (succ'=true);
-    [do] (t0 | t1) -> (succ'=true);
-    [le] (t0 | t1) -> (succ'=true);
+    [up] (t0 | t1 | t2 | t3 | t4) -> (succ'=true);
+    [ri] (t0 | t1 | t2 | t3 | t4) -> (succ'=true);
+    [do] (t0 | t1 | t2 | t3 | t4) -> (succ'=true);
+    [le] (t0 | t1 | t2 | t3 | t4) -> (succ'=true);
 
-    [up] !(t0 | t1) -> true;
-    [ri] !(t0 | t1) -> true;
-    [do] !(t0 | t1) -> true;
-    [le] !(t0 | t1) -> true;
+    [up] !(t0 | t1 | t2 | t3 | t4) -> true;
+    [ri] !(t0 | t1 | t2 | t3 | t4) -> true;
+    [do] !(t0 | t1 | t2 | t3 | t4) -> true;
+    [le] !(t0 | t1 | t2 | t3 | t4) -> true;
 endmodule
 
 
