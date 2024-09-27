@@ -1,4 +1,5 @@
 ES sched0 ES sched1
 A s0(sched0) A s1(sched1)
 Restrict s0 start0 Restrict s1 start1
-Pmax=? [(F ( !"stops0" & "treasures0")) & (F (!"stops1" & "treasures1")) & (G (!"succeededs0" | "succeededs1"))]
+// here we are saying that s1 must be faster to reach a treasure than s0
+Pmax=? [(F ( !"stops0" & "treasures0")) & (F (!"stops1" & "treasures1")) & (G (!"treasures0" | "treasures1"))]
