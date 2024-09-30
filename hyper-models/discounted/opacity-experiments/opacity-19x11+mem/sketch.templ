@@ -33,20 +33,26 @@ formula xr = right ? (x+1) : x;
 formula yd = down ? (y-1) : y;
 formula xl = left ? (x-1) : x;
 
+formula t0 = (x=2&y=0);
+formula t1 = (x=17&y=1);
+formula t3 = (x=1&y=10);
+formula t4 = (x=14&y=10);
+formula t = (t0 | t1 | t3 | t4);
+
 module maze
 	 x : [0..18];
 	 y : [0..10];
      act:[0..4] ; // 0: initial, 1: down, 2: up, 3: right, 4: left;
 
-        [up0] !sink & up   -> 0.9: (y'=yu) & (act'=2) + 0.1: (x'=xr) & (act' = 3);
-        [ri0] !sink & right   -> 0.9: (x'=xr) & (act' = 3) + 0.1: (y'=yd) & (act' = 1);
-        [do0] !sink & down   -> 0.9: (y'=yd) & (act' = 1) + 0.1: (x'=xl) & (act' = 4);
-        [le0] !sink & left   -> 0.9: (x'=xl) & (act' = 4) + 0.1: (y'=yu) & (act' = 2);
+        [up0] !sink & !t & up    -> 0.9: (y'=yu) & (act'=2) + 0.1: (x'=xr) & (act' = 3);
+        [ri0] !sink & !t & right -> 0.9: (x'=xr) & (act' = 3) + 0.1: (y'=yd) & (act' = 1);
+        [do0] !sink & !t & down  -> 0.9: (y'=yd) & (act' = 1) + 0.1: (x'=xl) & (act' = 4);
+        [le0] !sink & !t & left  -> 0.9: (x'=xl) & (act' = 4) + 0.1: (y'=yu) & (act' = 2);
 
-        [up1] !sink & up   -> 0.9: (y'=yu) & (act'=2) + 0.1: (x'=xr) & (act' = 3);
-        [ri1] !sink & right   -> 0.9: (x'=xr) & (act' = 3) + 0.1: (y'=yd) & (act' = 1);
-        [do1] !sink & down   -> 0.9: (y'=yd) & (act' = 1) + 0.1: (x'=xl) & (act' = 4);
-        [le1] !sink & left   -> 0.9: (x'=xl) & (act' = 4) + 0.1: (y'=yu) & (act' = 2);
+        [up1] !sink & !t & up    -> 0.9: (y'=yu) & (act'=2) + 0.1: (x'=xr) & (act' = 3);
+        [ri1] !sink & !t & right -> 0.9: (x'=xr) & (act' = 3) + 0.1: (y'=yd) & (act' = 1);
+        [do1] !sink & !t & down  -> 0.9: (y'=yd) & (act' = 1) + 0.1: (x'=xl) & (act' = 4);
+        [le1] !sink & !t & left  -> 0.9: (x'=xl) & (act' = 4) + 0.1: (y'=yu) & (act' = 2);
 endmodule
 
 const double discount_factor = 0.98;
@@ -76,12 +82,9 @@ endmodule
 
 init (((x=x0_init & y=y0_init) | (x=x1_init & y=y1_init)) & !sink & act=0 & memory=0) endinit
 
-formula t0 = (x=2&y=0);
-formula t1 = (x=17&y=1);
-formula t3 = (x=1&y=10);
-formula t4 = (x=14&y=10);
-
-label "treasure" = (t0 | t1 | t3 | t4);
+label "treasure" = (t);
+label "stop" = (sink);
+label "terminate" = (sink | t);
 
 // in the initial region
 label "class0" = (y=4 | y=5);
