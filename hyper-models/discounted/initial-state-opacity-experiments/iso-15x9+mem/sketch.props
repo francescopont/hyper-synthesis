@@ -1,0 +1,4 @@
+ES sched0
+A s0(sched0) A s1(sched0)
+Restrict s0 start0 Restrict s1 start1
+Pmax=? [(F ("treasures0" & !"sinks0" & "treasures1"& !"sinks1")) | ((!"sinks0" & !"sinks1") U ("sinks0" & "sinks1"))]
