@@ -1,0 +1,43 @@
+mdp
+
+const int N = 3;
+const double error = 0.1;
+global turn: bool; // when false R1 moves, when true R2 moves
+
+module robot1
+	x1:  [0..N-1];
+	y1:  [0..N-1];
+	act1:[0..4] ; // 0: initial, 1: down, 2: up, 3: right, 4: left
+
+	[]  turn=false & x1>0   & !((x1-1=x2)&(y1=y2))  -> (1-error):(x1'=x1-1)&(act1'=4)&(turn' =true) + error:(turn' =true);
+	[]  turn=false & x1<N-1 & !((x1+1=x2)&(y1=y2))  -> (1-error):(x1'=x1+1)&(act1'=3)&(turn' =true) + error:(turn' =true);
+	[]  turn=false & y1<N-1 & !((x1=x2)&(y1+1= y2)) -> (1-error):(y1'=y1+1)&(act1'=2)&(turn' =true) + error:(turn' =true);
+	[]  turn=false & y1>0   & !((x1=x2)&(y1-1= y2)) -> (1-error):(y1'=y1-1)&(act1'=1)&(turn' =true) + error:(turn' =true);
+
+endmodule
+
+module robot2
+	x2:  [0..N-1];
+	y2:  [0..N-1];
+	act2:[0..4]; // 0: initial, 1: down, 2: up, 3: right, 4: left
+
+	[]  turn=true & x2>0   & !((x2-1=x1)&(y2=y1))  -> (1-error):(x2'=x2-1)&(act2'=4)&(turn'=false) + error:(turn' =false);
+	[]  turn=true & x2<N-1 & !((x2+1=x1)&(y2=y2))  -> (1-error):(x2'=x2+1)&(act2'=3)&(turn'=false) + error:(turn' =false);
+	[]  turn=true & y2<N-1 & !((x2=x1)&(y2+1= y1)) -> (1-error):(y2'=y2+1)&(act2'=2)&(turn'=false) + error:(turn' =false);
+	[]  turn=true & y2>0   & !((x2=x1)&(y2-1= y1)) -> (1-error):(y2'=y2-1)&(act2'=1)&(turn'=false) + error:(turn' =false);
+
+endmodule
+
+init (x1=0&y1=0&act1=0)&(x2=N-1&y2=N-1&act2=0)&(turn=false) endinit
+
+label "goalR1" = (x1=floor(N/2)&y1=floor(N/2));
+label "goalR2" = (x2=floor(N/2)&y2=floor(N/2));
+
+label "act0" = act1=0;
+label "act1" = act1=1;
+label "act2" = act1=2;
+label "act3" = act1=3;
+label "act4" = act1=4;
+
+label "actR1" = act1=0|act1=1|act1=2|act1=3|act1=4;
+label "actR2" = act2=0|act2=1|act2=2|act2=3|act2=4;
