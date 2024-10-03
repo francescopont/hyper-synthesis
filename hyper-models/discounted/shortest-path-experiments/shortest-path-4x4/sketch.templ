@@ -49,7 +49,7 @@ endmodule
 
 init (((x=x0_init & y=y0_init) | (x=x1_init & y=y1_init)) & !sink) endinit
 
-label "treasure" = (t0 | t1);
+label "treasure" = (t0);
 label "stop" = (sink);
 label "start0" = (x=x0_init & y=y0_init);
 label "start1" = (x=x1_init & y=y1_init);
