@@ -54,7 +54,7 @@ formula t1 = (x=8&y=2);
 formula t2 = (x=2&y=3);
 
 rewards "cost"
-    true : x+y;
+    true : max(1, 12 - 2*x + 3*y);
 endrewards
 
 label "treasure" = (t0 | t1 | t2);

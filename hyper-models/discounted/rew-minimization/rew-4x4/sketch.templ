@@ -46,13 +46,12 @@ endmodule
 init (((x=x0_init & y=y0_init) | (x=x1_init & y=y1_init)) & !sink) endinit
 
 formula t0 = (x=2&y=1);
-formula t1 = (x=2&y=2);
 
 rewards "cost"
-    true : x+y;
+    true : max(1, 12 - 2*x + 3*y);
 endrewards
 
-label "treasure" = (t0 | t1);
+label "treasure" = (t0);
 label "stop" = (sink);
 label "start0" = (x=x0_init & y=y0_init);
 label "start1" = (x=x1_init & y=y1_init);

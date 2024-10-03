@@ -74,7 +74,7 @@ endmodule
 init (((x=x0_init & y=y0_init) | (x=x1_init & y=y1_init)) & !sink & memory=0) endinit
 
 rewards "cost"
-    true : x+y;
+    true : max(1, 12 - 2*x + 3*y);
 endrewards
 
 formula t0 = (x=2&y=0);
