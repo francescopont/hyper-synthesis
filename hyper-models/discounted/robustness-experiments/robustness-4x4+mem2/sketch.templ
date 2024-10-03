@@ -1,0 +1,100 @@
+mdp
+//  4 | .... .
+//  3 |   t  .
+//  2 | ........t
+//  1 | . . .   .
+//  0 | i .t. ......
+//    --------------
+//      ............
+
+formula up = (x=0&y=0)|(x=2&y=0)|(x=0&y=1)|(x=1&y=1)|(x=2&y=1)|(x=3&y=1)|(x=2&y=2);
+
+formula right = (x=1&y=0)|(x=2&y=0)|(x=1&y=1)|(x=0&y=2)|(x=1&y=2)|(x=2&y=2)|(x=1&y=3);
+
+formula down = (x=0&y=1)|(x=2&y=1)|(x=3&y=1)|(x=0&y=2)|(x=2&y=2)|(x=0&y=3)|(x=1&y=3)|(x=2&y=3)|(x=3&y=3);
+
+formula left = (x=1&y=0)|(x=3&y=0)|(x=1&y=1)|(x=3&y=1)|(x=1&y=2)|(x=2&y=2)|(x=3&y=2)|(x=3&y=3);
+
+const int x0_init = 0;
+const int y0_init = 0;
+
+const int x1_init = 0;
+const int y1_init = 3;
+
+
+formula yu = up ? (y+1) : y;
+formula xr = right ? (x+1) : x;
+formula yd = down ? (y-1) : y;
+formula xl = left ? (x-1) : x;
+
+formula t0 = (x=2&y=1);
+formula t1 = (x=2&y=2);
+formula t = (t0 | t1);
+
+module maze
+         x : [0..3];
+         y : [0..3];
+         fail : bool;
+        [up0] !sink & !t & up     -> 0.9: (y'=yu) + 0.1: (x'=xr) & (fail'=true);
+        [ri0] !sink & !t & right  -> 0.9: (x'=xr) + 0.1: (y'=yd) & (fail'=true);
+        [do0] !sink & !t & down   -> 0.9: (y'=yd) + 0.1: (x'=xl) & (fail'=true);
+        [le0] !sink & !t & left   -> 0.9: (x'=xl) + 0.1: (y'=yu) & (fail'=true);
+
+        [up1] !sink & !t & up     -> 0.9: (y'=yu) + 0.1: (x'=xr) & (fail'=true);
+        [ri1] !sink & !t & right  -> 0.9: (x'=xr) + 0.1: (y'=yd) & (fail'=true);
+        [do1] !sink & !t & down   -> 0.9: (y'=yd) + 0.1: (x'=xl) & (fail'=true);
+        [le1] !sink & !t & left   -> 0.9: (x'=xl) + 0.1: (y'=yu) & (fail'=true);
+
+        [up2] !sink & !t & up     -> 0.9: (y'=yu) + 0.1: (x'=xr) & (fail'=true);
+        [ri2] !sink & !t & right  -> 0.9: (x'=xr) + 0.1: (y'=yd) & (fail'=true);
+        [do2] !sink & !t & down   -> 0.9: (y'=yd) + 0.1: (x'=xl) & (fail'=true);
+        [le2] !sink & !t & left   -> 0.9: (x'=xl) + 0.1: (y'=yu) & (fail'=true);
+endmodule
+
+const double discount_factor = 0.98;
+module discounting
+        sink : bool;
+        [up0] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+        [ri0] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+        [do0] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+        [le0] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+
+        [up1] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+        [ri1] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+        [do1] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+        [le1] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+
+        [up2] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+        [ri2] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+        [do2] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+        [le2] true -> discount_factor : true + 1-discount_factor : (sink'=true);
+endmodule
+
+module memory
+        memory : [0..2];
+        [up0] true -> (memory'=0);
+        [ri0] true -> (memory'=0);
+        [do0] true -> (memory'=0);
+        [le0] true -> (memory'=0);
+
+        [up1] true -> (memory'=1);
+        [ri1] true -> (memory'=1);
+        [do1] true -> (memory'=1);
+        [le1] true -> (memory'=1);
+
+        [up2] true -> (memory'=2);
+        [ri2] true -> (memory'=2);
+        [do2] true -> (memory'=2);
+        [le2] true -> (memory'=2);
+endmodule
+
+
+init (((x=x0_init & y=y0_init) | (x=x1_init & y=y1_init)) & !sink & memory=0 & fail=false) endinit
+
+
+label "treasure" = (t);
+label "stop" = (sink);
+label "fail" = (fail);
+
+label "start0" = (x=x0_init & y=y0_init);
+label "start1" = (x=x1_init & y=y1_init);
