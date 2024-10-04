@@ -29,9 +29,9 @@ formula xl = left ? (x-1) : x;
 module maze
          x : [0..3];
          y : [0..3];
-        [up] !sink & up   -> 0.9: (y'=yu) + 0.1: (x'=xr);
-        [ri] !sink & right   -> 0.9: (x'=xr) + 0.1: (y'=yd);
-        [do] !sink & down   -> 0.9: (y'=yd) + 0.1: (x'=xl);
+        [up] !sink & up    -> 0.9: (y'=yu) + 0.1: (x'=xr);
+        [ri] !sink & right -> 0.9: (x'=xr) + 0.1: (y'=yd);
+        [do] !sink & down  -> 0.9: (y'=yd) + 0.1: (x'=xl);
         [le] !sink & left   -> 0.9: (x'=xl) + 0.1: (y'=yu);
 endmodule
 
@@ -50,7 +50,7 @@ formula t0 = (x=2&y=1);
 
 label "treasure" = (t0);
 label "stop" = (sink);
-label "goal" = (t0 | t1) & !sink;
+label "goal" = (t0) & !sink;
 
 label "start0" = (x=x0_init & y=y0_init);
 label "start1" = (x=x1_init & y=y1_init);
