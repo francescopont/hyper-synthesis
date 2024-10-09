@@ -1,4 +1,4 @@
 ES sched0 ES sched1
 A s0(sched0) A s1(sched1)
 Restrict s0 start0 Restrict s1 start1
-R{"costs0"}min=? [F ("treasures0" & "treasures1")]
+R{"steps0"}min=? [F ("treasures0" & "treasures1")]
