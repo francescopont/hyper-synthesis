@@ -1,5 +1,5 @@
 ES sched0
 A s0(sched0) A s1(sched0)
-Restrict s0 start1 Restrict s1 start0
+Restrict s0 start1 Restrict s1 start1
 // if one fails and the other does not, they still reach the target together (implies)
 Pmax=? [(!(((F "fails0") & !(F "fails1")) | ((F "fails1") & !(F "fails0")))) | ((F("treasures0" & "treasures1")) & (G (("treasures0" & "treasures1") | (!"treasures0" & !"treasures1"))))]
