@@ -2,4 +2,4 @@ ES sched0
 A s0(sched0) A s1(sched0)
 Restrict s0 start0 Restrict s1 start1
 //we want to hide the initial states: both replicas either reach the target together or fail together.
-Pmax=? [((!"treasures0" & !"treasures1") U ("treasures0" & !"sinks0" & "treasures1" & !"sinks1")) | ((!"sinks0" & !"sinks1") U ("sinks0" & "sinks1"))]
+Pmax=? [((!"treasures0" & !"treasures1") U ("treasures0" & !"sinks0" & "treasures1" & !"sinks1")) | ((!"sinks0" & !"sinks1" & !"treasures0" & !"treasures1") U ("sinks0" & "sinks1"))]
