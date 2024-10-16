@@ -1,4 +1,0 @@
-ES sched0 ES sched1
-A s0(sched0) A s1(sched1)
-Restrict s0 start0 Restrict s1 start1
-Pmax=? [(!(((("act0s0" & "act0s1") | ("act1s0" & "act1s1")  | ("act2s0" & "act2s1") | ("act3s0" & "act3s1") | ("act4s0" & "act4s1"))) U ("terminates0" | "terminates1"))) & (G (("class0s0" & "class0s1") | ("class1s0" & "class1s1") | ("class2s0" & "class2s1"))) & (F "treasures0") & (F "treasures1")]
