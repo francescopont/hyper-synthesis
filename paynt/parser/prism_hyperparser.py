@@ -433,6 +433,8 @@ class PrismHyperParser:
 
                 # resetting target states
                 new_target_sets = {}
+                logger.info(f"Target states of the cross-product: {list(product_rep.accepting_states)}")
+                assert list(product_rep.accepting_states)
                 for accepting_state in list(product_rep.accepting_states):
                     new_target_sets[accepting_state] = new_target_sets.get(accepting_state, []) + [index]
 
@@ -515,6 +517,8 @@ class PrismHyperParser:
                 if not property.raw_formula.subformula.is_eventually_formula or want_to_export:
                     new_rf = f"{match.group(1)}[F \"target{index}\"]\n"
                     target_states = [state for state, targetFormulas in target_sets.items() if index in targetFormulas]
+                    logger.info(f"target states for target{index}: {target_states}")
+                    assert target_states
                     quotient_mdp.labeling.add_label(f"target{index}")
                     quotient_mdp.labeling.set_states(f"target{index}",
                                                      stormpy.BitVector(quotient_mdp.nr_states, target_states))
@@ -543,6 +547,7 @@ class PrismHyperParser:
 
                 # accepting states of the full model
                 helpers["target states"] = list(quotient_mdp.labeling.get_states('target0'))
+                logger.info(f"setting the helpers target states: {list(quotient_mdp.labeling.get_states('target0'))}")
 
                 # product choice to action tuple
                 helpers["choice labeling"] = choice_to_action_tuple
