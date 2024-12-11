@@ -151,6 +151,8 @@ class MDP(MarkovChain):
     # if True, the secondary direction will be explored when primary is not enough
     compute_secondary_direction = False
 
+    first_query = True
+
     def __init__(self, model, quotient_container, quotient_state_map, quotient_choice_map, design_space):
         super().__init__(model, quotient_container, quotient_state_map, quotient_choice_map)
 
@@ -192,6 +194,10 @@ class MDP(MarkovChain):
 
         # check primary direction
         result.primary = self.model_check_property(prop, alt = False)
+        if MDP.first_query:
+            logger.info(f"Bound on the maximum achievable value function: {result.primary}")
+            MDP.first_query = False
+
         if not result.primary.improves_optimum:
             # OPT <= LB
             result.can_improve = False
