@@ -423,7 +423,7 @@ class PrismHyperParser:
 
         choice_to_action_tuple = cross_choice_to_actions_tuple
         index_to_product_state = cross_index_to_cross_state
-        product_transition_matrix = builder.build()
+        product_transition_matrix = builder.build(overridden_column_count=nr_cross_states)
         components = stormpy.SparseModelComponents(transition_matrix=product_transition_matrix,
                                                    state_labeling=cross_state_labeling,
                                                    rate_transitions=False)
