@@ -201,6 +201,70 @@ class PrismHyperParser:
         assert not specification.has_double_optimality, "did not expect double-optimality property"
         return specification
 
+    def generate_partially_observable_family(self, single_model, nr_replicas):
+        family = paynt.family.family.Family()
+        state_to_hole_indexes = [{} for _ in range(nr_replicas)]
+        assert single_model.has_observation_valuations, "Observations are not named"
+        assert single_model.model_type == stormpy.ModelType.POMDP
+
+        holes_dict = {} # hole name -> hole index
+
+        logger.info(f"Observations: {single_model.nr_observations}")
+        logger.info(f"Observation Vector: {single_model.observations}")
+
+        for state in single_model.states:
+            obs = single_model.get_observation(state.id)
+            obs_name = single_model.observation_valuations.get_string(obs)
+            state_name = single_model.state_valuations.get_string(state.id)
+
+
+            num_actions = single_model.get_nr_available_actions(state.id)
+            option_labels = []
+            if num_actions > 1:
+                for offset in range(num_actions):
+                    choice = single_model.get_choice_index(state, offset)
+                    label = single_model.choice_labeling.get_labels_of_choice(choice)
+                    option_labels.append(str(label))
+                state_holes = {}
+                for sched_name in self.sched_quant_dict.keys():
+                    hole_name = f"{obs_name}(sched {sched_name})"
+                    hole_index = holes_dict.get(hole_name, None)
+                    if hole_index is None:
+                        hole_index = family.num_holes
+                        logger.info(f"Creating hole {hole_name} in state {state_name} with options: {option_labels}")
+                        family.add_hole(hole_name, option_labels)
+                        holes_dict[hole_name] = hole_index
+                    else:
+                        assert family.hole_options_strings(hole_index) == option_labels, f"The same observation has different available actions in different state: {family.hole_options_strings(hole_index)} - {option_labels} (state {state_name})"
+                    state_holes[sched_name] = hole_index
+                for index, (_, sched_name) in enumerate(self.state_quant_dict.values()):
+                    state_to_hole_indexes[index][state.id] = state_holes[sched_name]
+
+        return family, state_to_hole_indexes
+
+
+    def generate_locally_fully_observable_family(self, single_model, nr_replicas):
+        family = paynt.family.family.Family()
+        state_to_hole_indexes = [{} for _ in range(nr_replicas)]
+        for state in single_model.states:
+            state_name = single_model.state_valuations.get_string(state.id)
+            num_actions = single_model.get_nr_available_actions(state.id)
+            option_labels = []
+            if num_actions > 1:
+                for offset in range(num_actions):
+                    choice = single_model.get_choice_index(state, offset)
+                    label = single_model.choice_labeling.get_labels_of_choice(choice)
+                    option_labels.append(str(label))
+                state_holes = {}
+                for sched_name in self.sched_quant_dict.keys():
+                    hole_name = f"{state_name}(sched {sched_name})"
+                    hole_index = family.num_holes
+                    family.add_hole(hole_name, option_labels)
+                    state_holes[sched_name] = hole_index
+                for index, (_, sched_name) in enumerate(self.state_quant_dict.values()):
+                    state_to_hole_indexes[index][state.id] = state_holes[sched_name]
+        return family, state_to_hole_indexes
+
     def read_prism(self, sketch_path, properties_path, relative_error, discount_factor, export):
 
         # loading the specification file
@@ -215,6 +279,7 @@ class PrismHyperParser:
         # parsing state quantifications
         logger.info("Parsing state quantifiers...")
         self.parse_state_quants()
+        state_variables = list(self.state_quant_dict.keys())
         logger.info(f"Found the following state quantifiers: {self.state_quant_dict}")
 
         # parsing restrictions on the initial states
@@ -238,49 +303,24 @@ class PrismHyperParser:
 
         # building the given model as it is
         single_model = stormpy.build_sparse_model_with_options(prism, builder_options)
-
         nr_initial_states = len(single_model.initial_states)
         nr_states = single_model.nr_states
-        logger.info(f"The original (non self-composed) model has {nr_initial_states} initial states and {nr_states} states")
+        nr_replicas = len(self.state_quant_dict)
+        logger.info(
+            f"The original (non self-composed) model has {nr_initial_states} initial states and {nr_states} states")
+        if single_model.is_partially_observable:
+            logger.info(f"IsThe original (non self-composed) model is a POMDP!")
 
         # generate the family of holes (aka parameters, schedulers' choices...)
         logger.info(f"Generating the family...")
-        family = paynt.family.family.Family()
-        nr_replicas = len(self.state_quant_dict)
-        state_variables = list(self.state_quant_dict.keys())
-        state_to_hole_index = [{} for _ in range(nr_replicas)]
-        for state in single_model.states:
-            state_name = single_model.state_valuations.get_string(state.id)
-            num_actions = single_model.get_nr_available_actions(state.id)
-            option_labels = []
-            if num_actions > 1:
-                for offset in range(num_actions):
-                    choice = single_model.get_choice_index(state, offset)
-                    label = single_model.choice_labeling.get_labels_of_choice(choice)
-                    option_labels.append(str(label))
-                state_holes = {}
-                for sched_name in self.sched_quant_dict.keys():
-                    replica_name = f"{state_name}(sched {sched_name})"
-                    hole_index = family.num_holes
-                    family.add_hole(replica_name, option_labels)
-                    state_holes[sched_name] = hole_index
-                for index, (_, sched_name) in enumerate(self.state_quant_dict.values()):
-                    state_to_hole_index[index][state.id] = state_holes[sched_name]
+        if single_model.is_partially_observable:
+            family, state_to_hole_indexes = self.generate_partially_observable_family(single_model, nr_replicas)
+        else:
+            family, state_to_hole_indexes = self.generate_locally_fully_observable_family(single_model, nr_replicas)
         logger.info(f"Current family has {family.num_holes} holes")
 
         # generate the state set of the self-composition
         state_permutations = list(product(range(nr_states), repeat= nr_replicas))
-        builder = stormpy.SparseMatrixBuilder(rows=0,columns=0, entries=0, force_dimensions=False,
-                                              has_custom_row_grouping=True, row_groups=0)
-
-        # generate the transition matrix of the self-composition
-        logger.info(f"generating the transition system of the self-composition")
-        choice_to_hole_options = []
-        cross_product_row_counter = 0
-
-        # some additional lists for exporting the model to Inf-JESP
-        cross_index_to_cross_state = []
-        cross_choice_to_actions_tuple = []
 
         # preprocess to avoid thousands of sink states
         freshId = 0
@@ -296,6 +336,16 @@ class PrismHyperParser:
                     deadlock_state = freshId
                 freshId += 1
 
+        # some additional lists for exporting the model to Inf-JESP
+        cross_index_to_cross_state = []
+        cross_choice_to_actions_tuple = []
+
+        # generate the transition matrix of the self-composition
+        logger.info(f"generating the transition system of the self-composition")
+        builder = stormpy.SparseMatrixBuilder(rows=0,columns=0, entries=0, force_dimensions=False,
+                                              has_custom_row_grouping=True, row_groups=0)
+        choice_to_hole_options = []
+        cross_product_row_counter = 0
         for states_tuple in state_permutations:
             # generate the state in the cross product associated with this tuple
             states = list(map(lambda id: single_model.states[id], states_tuple))
@@ -318,7 +368,7 @@ class PrismHyperParser:
                         cross_choice_to_actions_tuple.append(actions_tuple)
                         transitions_lists = [states[index].actions[id].transitions for index, id in enumerate(actions_tuple)]
                         for (index, action_id) in enumerate(actions_tuple):
-                            hole_id = state_to_hole_index[index].get(states_tuple[index], None)
+                            hole_id = state_to_hole_indexes[index].get(states_tuple[index], None)
                             if hole_id is not None: # if it is None, then there is no hole associated with this state
                                 choice_to_hole_options[cross_product_row_counter].append((hole_id,action_id))
                         transitions_tuples = product(*transitions_lists)
@@ -342,14 +392,7 @@ class PrismHyperParser:
         for label in single_model.labeling.get_labels():
             assert not label == 'soi', "Soi is a reserved label unfortunately"
             if label == 'deadlock':
-                # do nothing
-                '''
-                states = list(single_model.labeling.get_states(label))
-                affected_states = list(map(lambda tup: self.state_map(tup, nr_states), product(states, repeat=nr_replicas)))
-                cross_state_labeling.add_label(label)
-                cross_state_labeling.set_states(label,
-                                                stormpy.BitVector(len(state_permutations), affected_states))
-                '''
+                pass  # do nothing
             elif label == 'stop':
                 for index, state_variable in enumerate(state_variables):
                     cross_label = label + state_variable
@@ -383,7 +426,6 @@ class PrismHyperParser:
         product_transition_matrix = builder.build()
         components = stormpy.SparseModelComponents(transition_matrix=product_transition_matrix,
                                                    state_labeling=cross_state_labeling,
-                                                   #reward_models=cross_reward_models,
                                                    rate_transitions=False)
 
         # build the self-composition
@@ -416,7 +458,7 @@ class PrismHyperParser:
                     logger.info(f"Using fictitious formula {formula}")
 
                 #generate the cross-product model
-                product_rep  = stormpy.build_product_model(quotient_mdp, formula)
+                product_rep = stormpy.build_product_model(quotient_mdp, formula)
                 new_quotient_mdp = product_rep.product_model
                 p_index_to_p_state = product_rep.product_index_to_product_state
                 # add labels
