@@ -207,16 +207,12 @@ class PrismHyperParser:
         assert single_model.has_observation_valuations, "Observations are not named"
         assert single_model.model_type == stormpy.ModelType.POMDP
 
-        holes_dict = {} # hole name -> hole index
-
-        logger.info(f"Observations: {single_model.nr_observations}")
-        logger.info(f"Observation Vector: {single_model.observations}")
+        holes_dict = {}  # hole name -> hole index
 
         for state in single_model.states:
             obs = single_model.get_observation(state.id)
             obs_name = single_model.observation_valuations.get_string(obs)
             state_name = single_model.state_valuations.get_string(state.id)
-
 
             num_actions = single_model.get_nr_available_actions(state.id)
             option_labels = []
@@ -231,17 +227,18 @@ class PrismHyperParser:
                     hole_index = holes_dict.get(hole_name, None)
                     if hole_index is None:
                         hole_index = family.num_holes
-                        logger.info(f"Creating hole {hole_name} in state {state_name} with options: {option_labels}")
                         family.add_hole(hole_name, option_labels)
                         holes_dict[hole_name] = hole_index
                     else:
-                        assert family.hole_options_strings(hole_index) == option_labels, f"The same observation has different available actions in different state: {family.hole_options_strings(hole_index)} - {option_labels} (state {state_name})"
+                        assert family.hole_options_strings(hole_index) == option_labels, \
+                            f"The same observation has different available actions in different states: " \
+                            f"{family.hole_options_strings(hole_index)}. \n" \
+                            f"In current state {state_name} we have available: {option_labels}"
                     state_holes[sched_name] = hole_index
                 for index, (_, sched_name) in enumerate(self.state_quant_dict.values()):
                     state_to_hole_indexes[index][state.id] = state_holes[sched_name]
 
         return family, state_to_hole_indexes
-
 
     def generate_locally_fully_observable_family(self, single_model, nr_replicas):
         family = paynt.family.family.Family()
@@ -323,18 +320,19 @@ class PrismHyperParser:
         state_permutations = list(product(range(nr_states), repeat= nr_replicas))
 
         # preprocess to avoid thousands of sink states
-        freshId = 0
-        state_map = {}
-        deadlock_state = None # the only one we are allowing
+        fresh_id = 0
+        cross_index = {}
+        contains_stop = single_model.labeling.contains_label('stop')
+        deadlock_state = None  # the only one we are allowing
         for states_tuple in state_permutations:
             states = list(map(lambda id: single_model.states[id], states_tuple))
-            isDeadlock = single_model.labeling.contains_label('stop') and any(map(lambda state: single_model.labeling.has_state_label('stop', state), states))
-            if not isDeadlock or deadlock_state is None:
+            is_deadlock = contains_stop and any(map(lambda state: single_model.labeling.has_state_label('stop', state), states))
+            if not is_deadlock or deadlock_state is None:
                 # register this state
-                state_map[states_tuple] = freshId
-                if isDeadlock:
-                    deadlock_state = freshId
-                freshId += 1
+                cross_index[states_tuple] = fresh_id
+                if is_deadlock:
+                    deadlock_state = fresh_id
+                fresh_id += 1
 
         # some additional lists for exporting the model to Inf-JESP
         cross_index_to_cross_state = []
@@ -345,49 +343,49 @@ class PrismHyperParser:
         builder = stormpy.SparseMatrixBuilder(rows=0,columns=0, entries=0, force_dimensions=False,
                                               has_custom_row_grouping=True, row_groups=0)
         choice_to_hole_options = []
-        cross_product_row_counter = 0
+        cross_row_counter = 0
         for states_tuple in state_permutations:
             # generate the state in the cross product associated with this tuple
             states = list(map(lambda id: single_model.states[id], states_tuple))
-            cross_state = state_map.get(states_tuple, None)
+            cross_state = cross_index.get(states_tuple, None)
             if cross_state is not None:
                 cross_index_to_cross_state.append(states_tuple)
-                if cross_state == deadlock_state: # the deadlock state goes to itself
-                    builder.new_row_group(cross_product_row_counter)
+                if cross_state == deadlock_state:  # the deadlock state goes to itself
+                    builder.new_row_group(cross_row_counter)
                     choice_to_hole_options.append([])
                     cross_choice_to_actions_tuple.append(tuple([0 for _ in states_tuple]))
-                    builder.add_next_value(cross_product_row_counter, deadlock_state, 1)
-                    cross_product_row_counter += 1
+                    builder.add_next_value(cross_row_counter, deadlock_state, 1)
+                    cross_row_counter += 1
 
                 else:
                     actions_lists = list(map(lambda id: range(single_model.get_nr_available_actions(id)), states_tuple))
                     actions_tuples = product(*actions_lists) # all the actions of the tuple of states
-                    builder.new_row_group(cross_product_row_counter)
+                    builder.new_row_group(cross_row_counter)
                     for actions_tuple in actions_tuples:
                         choice_to_hole_options.append([])
                         cross_choice_to_actions_tuple.append(actions_tuple)
                         transitions_lists = [states[index].actions[id].transitions for index, id in enumerate(actions_tuple)]
                         for (index, action_id) in enumerate(actions_tuple):
                             hole_id = state_to_hole_indexes[index].get(states_tuple[index], None)
-                            if hole_id is not None: # if it is None, then there is no hole associated with this state
-                                choice_to_hole_options[cross_product_row_counter].append((hole_id,action_id))
+                            if hole_id is not None:  # if it is None, then there is no hole associated with this state
+                                choice_to_hole_options[cross_row_counter].append((hole_id,action_id))
                         transitions_tuples = product(*transitions_lists)
                         deadlock_prob = 0
                         for transitions_tuple in transitions_tuples:
                             destination_tuple = tuple(map(lambda transition: transition.column, transitions_tuple))
-                            destination = state_map.get(destination_tuple, None)
+                            destination = cross_index.get(destination_tuple, None)
                             value = prod(map(lambda transition: transition.value(), transitions_tuple))
                             if destination is None or destination == deadlock_state:
                                 deadlock_prob += value
                             else:
-                                builder.add_next_value(cross_product_row_counter, destination, value)
+                                builder.add_next_value(cross_row_counter, destination, value)
                         if deadlock_prob > 0:
-                            builder.add_next_value(cross_product_row_counter, deadlock_state, deadlock_prob)
-                        cross_product_row_counter += 1
+                            builder.add_next_value(cross_row_counter, deadlock_state, deadlock_prob)
+                        cross_row_counter += 1
 
         # generate the labelings of the self-composition
         logger.info("Generating the labels of the self-composition")
-        nr_cross_states = freshId
+        nr_cross_states = fresh_id
         cross_state_labeling = stormpy.storage.StateLabeling(nr_cross_states)
         for label in single_model.labeling.get_labels():
             assert not label == 'soi', "Soi is a reserved label unfortunately"
@@ -407,7 +405,7 @@ class PrismHyperParser:
                     lambda tup: all(map(lambda t: t[1] in single_model.labeling.get_labels_of_state(tup[t[0]]),
                                         list(self.state_quant_restrictions.items()))), affected_states_tuples))
                 affected_states = list(
-                    map(lambda tup: state_map[tup], filtered_state_tuples))
+                    map(lambda tup: cross_index[tup], filtered_state_tuples))
                 cross_state_labeling.add_label(label)
                 cross_state_labeling.set_states(label,
                                                 stormpy.BitVector(nr_cross_states, affected_states))
@@ -418,13 +416,13 @@ class PrismHyperParser:
                     cross_state_labeling.add_label(cross_label)
                     cross_state_labeling.set_states(cross_label,
                                                     stormpy.BitVector(nr_cross_states,
-                                                                      [state_map[tup] for tup in
-                                                                       state_map if tup[index] in affected_states and state_map[tup] != deadlock_state]))
+                                                                      [cross_index[tup] for tup in
+                                                                       cross_index if tup[index] in affected_states and cross_index[tup] != deadlock_state]))
 
         choice_to_action_tuple = cross_choice_to_actions_tuple
         index_to_product_state = cross_index_to_cross_state
-        product_transition_matrix = builder.build(overridden_column_count=nr_cross_states)
-        components = stormpy.SparseModelComponents(transition_matrix=product_transition_matrix,
+        cross_transition_matrix = builder.build(overridden_column_count=nr_cross_states)
+        components = stormpy.SparseModelComponents(transition_matrix=cross_transition_matrix,
                                                    state_labeling=cross_state_labeling,
                                                    rate_transitions=False)
 
