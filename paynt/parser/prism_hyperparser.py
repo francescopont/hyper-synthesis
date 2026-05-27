@@ -448,6 +448,7 @@ class PrismHyperParser:
                 for state in cross_product.states:
                     num_actions = cross_product.get_nr_available_actions(state.id)
                     (mdp_state, sA) = p_index_to_p_state[state.id]
+                    print(f"sA: {sA}")
 
                     # mark this tuple as target for previous formulae
                     if self.target_sets.get(mdp_state):
@@ -460,8 +461,8 @@ class PrismHyperParser:
                             if not (label == 'init'):
                                 cross_product.labeling.add_label_to_state(label, state.id)
 
-                    old_state_tuple = list(self.product_id_to_state_tuple[mdp_state])
-                    new_product_id_to_state_tuple.append(tuple(old_state_tuple + [sA]))
+                    old_state_tuple = self.product_id_to_state_tuple[mdp_state]
+                    new_product_id_to_state_tuple.append(old_state_tuple + (sA,))
 
                     for offset in range(num_actions):
                         old_choice = self.composed_model.get_choice_index(mdp_state, offset)
@@ -469,9 +470,8 @@ class PrismHyperParser:
                         if want_to_export:
                             if num_actions > 1:  # this state has to be mapped to a hole
                                 assert old_hole_options
-                                old_actions_tuple = list(self.choice_to_action_tuple[old_choice])
-                                old_actions_tuple.append(0)
-                                new_choice_to_actions_tuple.append(tuple(old_actions_tuple))
+                                old_actions_tuple = self.choice_to_action_tuple[old_choice]
+                                new_choice_to_actions_tuple.append(old_actions_tuple + (0,))
                             else:
                                 assert not old_hole_options
                                 new_choice_to_actions_tuple.append(tuple([0 for _ in range(n + 1)]))
@@ -528,11 +528,17 @@ class PrismHyperParser:
 
         # remove non-zipped model
         os.remove(file_name)
-            
+
         # some assertions for safety
         assert self.composed_model.labeling.contains_label("target0")
         assert not self.composed_model.labeling.contains_label("target1")
 
+        if single_model.is_partially_observable:
+            # refactor the state labeling: each agent gets observations, not the full information of the current state
+            # the agent is the DRA, which always gets the same observation.
+            get_obs = lambda state_id: single_model.get_observation(state_id)
+            self.product_id_to_state_tuple = list(map(lambda t: tuple(map(get_obs, t[:-1])) + (0,),
+                                                      self.product_id_to_state_tuple))
 
         with open(f"{sketch_folder}/helpers.json", "w") as file:
             helpers = {"state labeling": self.product_id_to_state_tuple,
