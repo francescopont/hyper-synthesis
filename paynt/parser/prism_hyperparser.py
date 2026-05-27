@@ -288,7 +288,7 @@ class PrismHyperParser:
         return family
 
     def build_self_composition(self, single_model, n, state_variables, want_to_export):
-        assert len(self.state_to_hole_indexes == n)
+        assert len(self.state_to_hole_indexes) == n
         contains_stop = single_model.labeling.contains_label('stop')
         logger.warning(f"Assuming \"stop\" is a special label to mark deadlock states, "
                        f"and collapsing all deadlock states in a single one. "
@@ -364,9 +364,9 @@ class PrismHyperParser:
         sc_state_labeling = stormpy.storage.StateLabeling(nr_sc_states)
         for label in single_model.labeling.get_labels():
             assert not label == 'soi', "Soi is a reserved label. Please change it to another label."
-            assert not label  == 'deadlock', "We do not support states labelled as deadlock states. " \
-                                             "Please check your model."
-            if label == 'stop':
+            if label == "deadlock":
+                pass
+            elif label == 'stop':
                 for index, state_variable in enumerate(state_variables):
                     sc_label = label + state_variable
                     sc_state_labeling.add_label(sc_label)
@@ -406,10 +406,10 @@ class PrismHyperParser:
         self.composed_model = stormpy.storage.SparseMdp(components)
         logger.info(f"Number of states of the self-composition: {self.composed_model.nr_states}")
 
-    def build_cross_product(self, single_model, want_to_export, specification, single_property, n, state_variables):
+    def build_cross_product(self, single_model, want_to_export, single_property, n, state_variables):
         # constructing the cross-product(s) with the automata for the formulae
 
-        for index, property in enumerate(specification.stormpy_properties()):
+        for index, property in enumerate(self.specification.stormpy_properties()):
             if (not property.raw_formula.subformula.is_eventually_formula) or want_to_export:
                 formula = property.raw_formula
 
@@ -627,9 +627,9 @@ class PrismHyperParser:
         # generate the family of holes (aka parameters, schedulers' choices...)
         logger.info(f"Generating the family...")
         if single_model.is_partially_observable:
-            family, state_to_hole_indexes = self.generate_partially_observable_family(single_model, nr_replicas)
+            family = self.generate_partially_observable_family(single_model, nr_replicas)
         else:
-            family, state_to_hole_indexes = self.generate_locally_fully_observable_family(single_model, nr_replicas)
+            family = self.generate_locally_fully_observable_family(single_model, nr_replicas)
         logger.info(f"Current family has {family.num_holes} holes")
 
         # check if export is needed
