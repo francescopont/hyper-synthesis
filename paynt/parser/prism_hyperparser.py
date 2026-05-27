@@ -23,9 +23,29 @@ class PrismHyperParser:
         self.state_quant_dict = {}
         self.state_quant_restrictions = {}
 
+        # a list of dictionaries. Dictionary i maps states of replica i to their holes.
+        self.state_to_hole_indexes = []
+
+        # each choice in the self-composition, or cross-product,
+        # corresponds to a tuple of agents' actions in the original MDP
+        # needed only for exporting the model to Inf-JESP.
+        self.choice_to_action_tuple = []
+
+        # each choice in the self-composition, or cross-product,
+        # maps some holes to fix their option.
+        self.choice_to_hole_options = []
+
+        # each state in the self-composition, or cross-product
+        # corresponds to a tuple of states of the original model
+        self.product_id_to_state_tuple = []
+
         # parsed lines of the property
         self.lines = []
 
+        self.composed_model = None
+        self.target_sets = {}
+
+        self.specification = None
         # parsed optimality properties
         self.optimality_property = None
 
@@ -55,7 +75,7 @@ class PrismHyperParser:
             if sched_name in list(self.sched_quant_dict.keys()):
                 raise Exception("two scheduler variables cannot have the same name")
 
-            # for now we support only straighforward synthesis specifications
+            # for now, we support only straighforward synthesis specifications
             # hence currently the dictionary values are never retrieved
             if sched_quant == "AS":
                 # TODO: implement encoding of AS quantifications
@@ -74,7 +94,6 @@ class PrismHyperParser:
             if match is None:
                 raise Exception(f"scheduler quantification is wrongly formatted: {line}!")
 
-
     # the second line of the specifications contains state quantifications
     def parse_state_quants(self):
         # parse state quantifiers
@@ -92,11 +111,11 @@ class PrismHyperParser:
 
             # every scheduler variable must be quantified
             if sched_name not in list(self.sched_quant_dict.keys()):
-                raise Exception(f"a scheduler variable occurs free in the state quantifications: {line}")
+                raise Exception(f"a scheduler variable occurs free in the state quantifications: {line}.")
 
             # the implementation of HyperPaynt supports only specifications in conjunctive normal form
             if existential_quantifier and state_quant == "A":
-                raise Exception(f"this nesting E*A* of state quantifications is not allowed: please use conjunctions of disjuctions (A*E*)")
+                raise Exception(f"this nesting E*A* of state quantifications is not allowed: please use conjunctions of disjuctions (A*E*).")
 
             if state_name in list(self.state_quant_dict.keys()):
                 raise Exception(f"two state variables cannot have the same name: {state_name}")
@@ -115,7 +134,7 @@ class PrismHyperParser:
             line = match.group(5)
             match = state_re.search(line)
             if match is None:
-                raise Exception(f"the input formula is wrongly formatted: {line}")
+                raise Exception(f"this part of the input formula is wrongly formatted: {line}.\nExpecting some state quantifier.")
 
     # the third line of the specifications contains restrictions to state variables
     def parse_restrictions(self):
@@ -131,10 +150,10 @@ class PrismHyperParser:
             state_name = match.group(1)
             restriction_label = match.group(2)
             if state_name not in self.state_quant_dict:
-                raise Exception(f"Trying to restrict a variable not in scope: {state_name}")
+                raise Exception(f"Trying to restrict a variable not in scope: {state_name}.")
             replica_number = list(self.state_quant_dict).index(state_name)
             if replica_number in self.state_quant_restrictions:
-                raise Exception(f"Trying to restrict two times the same variable: {state_name}")
+                raise Exception(f"Trying to restrict two times the same variable: {state_name}.")
 
             # storing this restriction
             self.state_quant_restrictions[replica_number] = restriction_label
@@ -147,7 +166,7 @@ class PrismHyperParser:
             line = match.group(4)
             match = restriction_re.search(line)
             if match is None:
-                raise Exception(f"Wrong formatted restrictions: {line}")
+                raise Exception(f"Wrong formatted restrictions: {line}.")
 
     def parse_property(self, line):
         '''
@@ -196,34 +215,37 @@ class PrismHyperParser:
                                                                             relative_error)
             properties.append(prop)
 
-        specification = paynt.verification.property.Specification(properties)
-        logger.info(f"found the following specification: {specification}")
-        assert not specification.has_double_optimality, "did not expect double-optimality property"
-        return specification
+        self.specification = paynt.verification.property.Specification(properties)
+        logger.info(f"found the following specification: {self.specification}")
+        assert not self.specification.has_double_optimality, "did not expect double-optimality property"
 
     def generate_partially_observable_family(self, single_model, nr_replicas):
         family = paynt.family.family.Family()
-        state_to_hole_indexes = [{} for _ in range(nr_replicas)]
-        assert single_model.has_observation_valuations, "Observations are not named"
+        self.state_to_hole_indexes = [{} for _ in range(nr_replicas)]
+        assert single_model.has_observation_valuations, "Observations are not named."
         assert single_model.model_type == stormpy.ModelType.POMDP
+        contains_stop = single_model.labeling.contains_label('stop')
 
         holes_dict = {}  # hole name -> hole index
 
         for state in single_model.states:
             obs = single_model.get_observation(state.id)
             obs_name = single_model.observation_valuations.get_string(obs)
+            print(f"Obs: {obs}.\nObs Name: {obs_name}")
             state_name = single_model.state_valuations.get_string(state.id)
 
             num_actions = single_model.get_nr_available_actions(state.id)
             option_labels = []
             if num_actions > 1:
+                if contains_stop:
+                    assert not single_model.labeling.has_state_label('stop', state)
                 for offset in range(num_actions):
                     choice = single_model.get_choice_index(state, offset)
                     label = single_model.choice_labeling.get_labels_of_choice(choice)
                     option_labels.append(str(label))
                 state_holes = {}
                 for sched_name in self.sched_quant_dict.keys():
-                    hole_name = f"{obs_name}(sched {sched_name})"
+                    hole_name = f"{obs_name}({sched_name})"
                     hole_index = holes_dict.get(hole_name, None)
                     if hole_index is None:
                         hole_index = family.num_holes
@@ -236,31 +258,319 @@ class PrismHyperParser:
                             f"In current state {state_name} we have available: {option_labels}"
                     state_holes[sched_name] = hole_index
                 for index, (_, sched_name) in enumerate(self.state_quant_dict.values()):
-                    state_to_hole_indexes[index][state.id] = state_holes[sched_name]
+                    self.state_to_hole_indexes[index][state.id] = state_holes[sched_name]
 
-        return family, state_to_hole_indexes
+        return family
 
     def generate_locally_fully_observable_family(self, single_model, nr_replicas):
         family = paynt.family.family.Family()
-        state_to_hole_indexes = [{} for _ in range(nr_replicas)]
+        self.state_to_hole_indexes = [{} for _ in range(nr_replicas)]
+        contains_stop = single_model.labeling.contains_label('stop')
         for state in single_model.states:
             state_name = single_model.state_valuations.get_string(state.id)
             num_actions = single_model.get_nr_available_actions(state.id)
             option_labels = []
             if num_actions > 1:
+                if contains_stop:
+                    assert not single_model.labeling.has_state_label('stop', state)
                 for offset in range(num_actions):
                     choice = single_model.get_choice_index(state, offset)
                     label = single_model.choice_labeling.get_labels_of_choice(choice)
                     option_labels.append(str(label))
                 state_holes = {}
                 for sched_name in self.sched_quant_dict.keys():
-                    hole_name = f"{state_name}(sched {sched_name})"
+                    hole_name = f"{state_name}({sched_name})"
                     hole_index = family.num_holes
                     family.add_hole(hole_name, option_labels)
                     state_holes[sched_name] = hole_index
                 for index, (_, sched_name) in enumerate(self.state_quant_dict.values()):
-                    state_to_hole_indexes[index][state.id] = state_holes[sched_name]
-        return family, state_to_hole_indexes
+                    self.state_to_hole_indexes[index][state.id] = state_holes[sched_name]
+        return family
+
+    def build_self_composition(self, single_model, n, state_variables, want_to_export):
+        assert len(self.state_to_hole_indexes == n)
+        contains_stop = single_model.labeling.contains_label('stop')
+        logger.warning(f"Assuming \"stop\" is a special label to mark deadlock states, "
+                       f"and collapsing all deadlock states in a single one. "
+                       f"Please change it to another label if this is not the intended meaning.")
+
+        # generate the state set of the self-composition
+        # preprocess to avoid thousands of sink states, sc = self-composition
+        nr_states = single_model.nr_states
+        state_permutations = list(product(range(nr_states), repeat=n))
+        deadlock_state = None  # the only one we are allowing
+        sc_state_to_sc_index = {}
+        fresh_id = 0
+        for states_tuple in state_permutations:
+            states = list(map(lambda id: single_model.states[id], states_tuple))
+            is_deadlock = contains_stop and any(
+                map(lambda state: single_model.labeling.has_state_label('stop', state), states))
+            if not is_deadlock or deadlock_state is None:
+                # register this state
+                sc_state_to_sc_index[states_tuple] = fresh_id
+                if is_deadlock:
+                    deadlock_state = fresh_id
+                fresh_id += 1
+
+        # generate the transition matrix of the self-composition
+        logger.info(f"generating the transition system of the self-composition")
+        builder = stormpy.SparseMatrixBuilder(rows=0, columns=0, entries=0, force_dimensions=False,
+                                              has_custom_row_grouping=True, row_groups=0)
+        sc_row_counter = 0
+        for states_tuple in state_permutations:
+            # generate the state in the cross product associated with this tuple
+            states = list(map(lambda id: single_model.states[id], states_tuple))
+            sc_state = sc_state_to_sc_index.get(states_tuple, None)
+            if sc_state is not None:
+                self.product_id_to_state_tuple.append(states_tuple)
+                if sc_state == deadlock_state:  # the deadlock state goes to itself
+                    builder.new_row_group(sc_row_counter)
+                    self.choice_to_hole_options.append([])
+                    if want_to_export:
+                        self.choice_to_action_tuple.append(tuple([0 for _ in states_tuple]))
+                    builder.add_next_value(sc_row_counter, deadlock_state, 1)
+                    sc_row_counter += 1
+
+                else:
+                    actions_lists = list(map(lambda id: range(single_model.get_nr_available_actions(id)), states_tuple))
+                    actions_tuples = product(*actions_lists) # all the available tuples of actions of the tuple of states
+                    builder.new_row_group(sc_row_counter)
+                    for actions_tuple in actions_tuples:
+                        self.choice_to_hole_options.append([])
+                        self.choice_to_action_tuple.append(actions_tuple)
+                        transitions_lists = [states[index].actions[id].transitions for index, id in
+                                             enumerate(actions_tuple)]
+                        for (index, action_id) in enumerate(actions_tuple):
+                            hole_id = self.state_to_hole_indexes[index].get(states_tuple[index], None)
+                            if hole_id is not None:  # if it is None, then there is no hole associated with this state
+                                self.choice_to_hole_options[sc_row_counter].append((hole_id, action_id))
+                        transitions_tuples = product(*transitions_lists)
+                        deadlock_prob = 0
+                        for transitions_tuple in transitions_tuples:
+                            destination_tuple = tuple(map(lambda transition: transition.column, transitions_tuple))
+                            destination = sc_state_to_sc_index.get(destination_tuple, None)
+                            value = prod(map(lambda transition: transition.value(), transitions_tuple))
+                            if destination is None or destination == deadlock_state:
+                                deadlock_prob += value
+                            else:
+                                builder.add_next_value(sc_row_counter, destination, value)
+                        if deadlock_prob > 0:
+                            builder.add_next_value(sc_row_counter, deadlock_state, deadlock_prob)
+                        sc_row_counter += 1
+
+        # generate the labelings of the self-composition
+        logger.info("Generating the labels of the self-composition")
+        nr_sc_states = fresh_id
+        sc_state_labeling = stormpy.storage.StateLabeling(nr_sc_states)
+        for label in single_model.labeling.get_labels():
+            assert not label == 'soi', "Soi is a reserved label. Please change it to another label."
+            assert not label  == 'deadlock', "We do not support states labelled as deadlock states. " \
+                                             "Please check your model."
+            if label == 'stop':
+                for index, state_variable in enumerate(state_variables):
+                    sc_label = label + state_variable
+                    sc_state_labeling.add_label(sc_label)
+                    sc_state_labeling.set_states(sc_label,
+                                                    stormpy.BitVector(nr_sc_states, [deadlock_state]))
+
+            # reserved label for initial states
+            elif label == 'init':
+                states = list(single_model.labeling.get_states(label))
+                affected_states_tuples = list(product(states, repeat=n))
+                filtered_state_tuples = list(filter(
+                    lambda tup: all(map(lambda t: t[1] in single_model.labeling.get_labels_of_state(tup[t[0]]),
+                                        list(self.state_quant_restrictions.items()))), affected_states_tuples))
+                affected_states = list(
+                    map(lambda tup: sc_state_to_sc_index[tup], filtered_state_tuples))
+                sc_state_labeling.add_label(label)
+                sc_state_labeling.set_states(label,
+                                                stormpy.BitVector(nr_sc_states, affected_states))
+            else:
+                affected_states = list(single_model.labeling.get_states(label))
+                for index, state_variable in enumerate(state_variables):
+                    sc_label = label + state_variable
+                    sc_state_labeling.add_label(sc_label)
+                    sc_state_labeling.set_states(sc_label,
+                                                    stormpy.BitVector(nr_sc_states,
+                                                                      [sc_state_to_sc_index[tup] for tup in
+                                                                       sc_state_to_sc_index if
+                                                                       tup[index] in affected_states and
+                                                                       sc_state_to_sc_index[tup] != deadlock_state]))
+
+        sc_transition_matrix = builder.build(overridden_column_count=nr_sc_states)
+        components = stormpy.SparseModelComponents(transition_matrix=sc_transition_matrix,
+                                                   state_labeling=sc_state_labeling,
+                                                   rate_transitions=False)
+
+        # build the self-composition
+        self.composed_model = stormpy.storage.SparseMdp(components)
+        logger.info(f"Number of states of the self-composition: {self.composed_model.nr_states}")
+
+    def build_cross_product(self, single_model, want_to_export, specification, single_property, n, state_variables):
+        # constructing the cross-product(s) with the automata for the formulae
+
+        for index, property in enumerate(specification.stormpy_properties()):
+            if (not property.raw_formula.subformula.is_eventually_formula) or want_to_export:
+                formula = property.raw_formula
+
+                logger.info(f"Generating explicit cross-product for formula: {formula}")
+                if formula.is_reward_operator:
+                    logger.info(f"Refactoring formula to give it to STORM")
+                    rf = str(formula)
+                    formula_re = re.compile(r'^(.*)\[(.*)\]')
+                    match = formula_re.search(rf)
+                    formula = stormpy.parse_properties_without_context(f"Pmax=?[{match.group(2)}]\n")[0]
+                    logger.info(f"Using fictitious formula {formula}")
+
+                # generate the cross-product model
+                product_rep = stormpy.build_product_model(self.composed_model, formula)
+                cross_product = product_rep.product_model
+                p_index_to_p_state = product_rep.product_index_to_product_state
+                # add labels
+                for label in self.composed_model.labeling.get_labels():
+                    if not (label == 'soi'):
+                        cross_product.labeling.add_label(label)
+                logger.info(f"Number of states of the cross-product: {cross_product.nr_states}")
+
+                # resetting the initial state
+                assert cross_product.labeling.contains_label("soi")
+                initial_states = list(cross_product.labeling.get_states("soi"))
+                assert len(initial_states) == 1
+                cross_product.labeling.add_label_to_state("init", initial_states[0])
+
+                # generate the family and the choice_to_hole_option mapping
+                logger.info("Regenerating choice-to-hole-options to adapt to cross-product - family does not change")
+                new_choice_to_hole_options = []
+                new_choice_to_actions_tuple = []  # to export to Inf-JESP
+                new_product_id_to_state_tuple = []
+                new_target_sets = {}
+
+                for state in cross_product.states:
+                    num_actions = cross_product.get_nr_available_actions(state.id)
+                    (mdp_state, sA) = p_index_to_p_state[state.id]
+
+                    # mark this tuple as target for previous formulae
+                    if self.target_sets.get(mdp_state):
+                        new_target_sets[state.id] = self.target_sets[mdp_state]
+
+                    # readding labels for next cross products, each cross-product needs its own.
+                    if not single_property:
+                        labels = self.composed_model.labeling.get_labels_of_state(mdp_state)
+                        for label in labels:
+                            if not (label == 'init'):
+                                cross_product.labeling.add_label_to_state(label, state.id)
+
+                    old_state_tuple = list(self.product_id_to_state_tuple[mdp_state])
+                    new_product_id_to_state_tuple.append(tuple(old_state_tuple + [sA]))
+
+                    for offset in range(num_actions):
+                        old_choice = self.composed_model.get_choice_index(mdp_state, offset)
+                        old_hole_options = self.choice_to_hole_options[old_choice]
+                        if want_to_export:
+                            if num_actions > 1:  # this state has to be mapped to a hole
+                                assert old_hole_options
+                                old_actions_tuple = list(self.choice_to_action_tuple[old_choice])
+                                old_actions_tuple.append(0)
+                                new_choice_to_actions_tuple.append(tuple(old_actions_tuple))
+                            else:
+                                assert not old_hole_options
+                                new_choice_to_actions_tuple.append(tuple([0 for _ in range(n + 1)]))
+                        new_choice_to_hole_options.append(old_hole_options)
+
+                # updating various information
+                # adding target states of this property
+                logger.info(f"Target states of the cross-product: {list(product_rep.accepting_states)}")
+                assert list(product_rep.accepting_states)
+                for accepting_state in list(product_rep.accepting_states):
+                    # the state is accepting also for this formula.
+                    new_target_sets[accepting_state] = new_target_sets.get(accepting_state, []) + [index]
+                self.target_sets = new_target_sets
+
+                self.composed_model = cross_product
+                self.choice_to_hole_options = new_choice_to_hole_options
+                self.product_id_to_state_tuple = new_product_id_to_state_tuple
+                if want_to_export:
+                    self.choice_to_action_tuple = new_choice_to_actions_tuple
+
+        # generate the reward models of the overall cross-product
+        logger.info(f"Generating the reward model of the self-composition")
+        reward_models = {}
+        for name, reward_model in single_model.reward_models.items():
+            assert reward_model.has_state_rewards
+            assert not reward_model.has_state_action_rewards
+            assert not reward_model.has_transition_rewards
+            for index, state_variable in enumerate(state_variables):
+                state_reward = [reward_model.get_state_reward(state_tuple[index]) for state_tuple in
+                                self.product_id_to_state_tuple]
+                reward_name = name + state_variable
+                reward_models[reward_name] = stormpy.SparseRewardModel(state_reward)
+
+        if reward_models:
+            components = stormpy.SparseModelComponents(transition_matrix=self.composed_model.transition_matrix,
+                                                       state_labeling=self.composed_model.labeling,
+                                                       reward_models=reward_models,
+                                                       rate_transitions=False)
+
+            self.composed_model = stormpy.storage.SparseMdp(components)
+
+    def export_to_drn(self, single_model, sketch_path):
+        # export the build model
+        sketch_folder = sketch_path.replace("sketch.templ", "")
+
+        # export the model
+        file_name = f"{sketch_folder}/model.drn"
+        stormpy.export_to_drn(self.composed_model, file_name)
+
+        #zip the model
+        zipped_file_name = f"{sketch_folder}/model.zip"
+        with zipfile.ZipFile(zipped_file_name, 'w', zipfile.ZIP_DEFLATED) as myzip:
+            myzip.write(file_name)
+
+        # remove non-zipped model
+        os.remove(file_name)
+            
+        # some assertions for safety
+        assert self.composed_model.labeling.contains_label("target0")
+        assert not self.composed_model.labeling.contains_label("target1")
+
+
+        with open(f"{sketch_folder}/helpers.json", "w") as file:
+            helpers = {"state labeling": self.product_id_to_state_tuple,
+                       "target states": list(self.composed_model.labeling.get_states('target0')),
+                       "choice labeling": self.choice_to_action_tuple}
+
+            # accepting states of the full model
+            logger.info(
+                f"Setting target states while exporting: {list(self.composed_model.labeling.get_states('target0'))}")
+            json.dump(helpers, file)
+
+        logger.info("hyperExport OK, aborting...")
+        exit(0)
+
+    def refactor_specification(self, want_to_export):
+        # refactor formulae to have only reachability probabilities
+        self.lines = []
+        for index, property in enumerate(self.specification.stormpy_properties()):
+
+            # refactor the formula
+            formula = property.raw_formula
+            logger.info(f"Refactoring formula: {formula}")
+            rf = str(formula)
+            formula_re = re.compile(r'^(.*)\[(.*)\]')
+            match = formula_re.search(rf)
+            if match is None:
+                raise Exception(f"Formula is not supported: {rf}!")
+            if not property.raw_formula.subformula.is_eventually_formula or want_to_export:
+                new_rf = f"{match.group(1)}[F \"target{index}\"]\n"
+                target_states = [state for state, targetFormulas in self.target_sets.items() if index in targetFormulas]
+                logger.info(f"target states for target{index}: {target_states}")
+                assert target_states
+                self.composed_model.labeling.add_label(f"target{index}")
+                self.composed_model.labeling.set_states(f"target{index}",
+                                                        stormpy.BitVector(self.composed_model.nr_states, target_states))
+            else:
+                new_rf = rf
+            self.lines.append(new_rf)
 
     def read_prism(self, sketch_path, properties_path, relative_error, discount_factor, export):
 
@@ -276,7 +586,6 @@ class PrismHyperParser:
         # parsing state quantifications
         logger.info("Parsing state quantifiers...")
         self.parse_state_quants()
-        state_variables = list(self.state_quant_dict.keys())
         logger.info(f"Found the following state quantifiers: {self.state_quant_dict}")
 
         # parsing restrictions on the initial states
@@ -303,10 +612,11 @@ class PrismHyperParser:
         nr_initial_states = len(single_model.initial_states)
         nr_states = single_model.nr_states
         nr_replicas = len(self.state_quant_dict)
+        state_variables = list(self.state_quant_dict.keys())
         logger.info(
             f"The original (non self-composed) model has {nr_initial_states} initial states and {nr_states} states")
         if single_model.is_partially_observable:
-            logger.info(f"IsThe original (non self-composed) model is a POMDP!")
+            logger.info(f"The original (non self-composed) model is a POMDP!")
 
         # generate the family of holes (aka parameters, schedulers' choices...)
         logger.info(f"Generating the family...")
@@ -316,291 +626,35 @@ class PrismHyperParser:
             family, state_to_hole_indexes = self.generate_locally_fully_observable_family(single_model, nr_replicas)
         logger.info(f"Current family has {family.num_holes} holes")
 
-        # generate the state set of the self-composition
-        state_permutations = list(product(range(nr_states), repeat= nr_replicas))
+        # check if export is needed
+        assert (export is None) or (export == "drn"), "can export hypermodels only in zipped drn format for the moment"
+        want_to_export = export is not None
 
-        # preprocess to avoid thousands of sink states
-        fresh_id = 0
-        cross_index = {}
-        contains_stop = single_model.labeling.contains_label('stop')
-        deadlock_state = None  # the only one we are allowing
-        for states_tuple in state_permutations:
-            states = list(map(lambda id: single_model.states[id], states_tuple))
-            is_deadlock = contains_stop and any(map(lambda state: single_model.labeling.has_state_label('stop', state), states))
-            if not is_deadlock or deadlock_state is None:
-                # register this state
-                cross_index[states_tuple] = fresh_id
-                if is_deadlock:
-                    deadlock_state = fresh_id
-                fresh_id += 1
-
-        # some additional lists for exporting the model to Inf-JESP
-        cross_index_to_cross_state = []
-        cross_choice_to_actions_tuple = []
-
-        # generate the transition matrix of the self-composition
-        logger.info(f"generating the transition system of the self-composition")
-        builder = stormpy.SparseMatrixBuilder(rows=0,columns=0, entries=0, force_dimensions=False,
-                                              has_custom_row_grouping=True, row_groups=0)
-        choice_to_hole_options = []
-        cross_row_counter = 0
-        for states_tuple in state_permutations:
-            # generate the state in the cross product associated with this tuple
-            states = list(map(lambda id: single_model.states[id], states_tuple))
-            cross_state = cross_index.get(states_tuple, None)
-            if cross_state is not None:
-                cross_index_to_cross_state.append(states_tuple)
-                if cross_state == deadlock_state:  # the deadlock state goes to itself
-                    builder.new_row_group(cross_row_counter)
-                    choice_to_hole_options.append([])
-                    cross_choice_to_actions_tuple.append(tuple([0 for _ in states_tuple]))
-                    builder.add_next_value(cross_row_counter, deadlock_state, 1)
-                    cross_row_counter += 1
-
-                else:
-                    actions_lists = list(map(lambda id: range(single_model.get_nr_available_actions(id)), states_tuple))
-                    actions_tuples = product(*actions_lists) # all the actions of the tuple of states
-                    builder.new_row_group(cross_row_counter)
-                    for actions_tuple in actions_tuples:
-                        choice_to_hole_options.append([])
-                        cross_choice_to_actions_tuple.append(actions_tuple)
-                        transitions_lists = [states[index].actions[id].transitions for index, id in enumerate(actions_tuple)]
-                        for (index, action_id) in enumerate(actions_tuple):
-                            hole_id = state_to_hole_indexes[index].get(states_tuple[index], None)
-                            if hole_id is not None:  # if it is None, then there is no hole associated with this state
-                                choice_to_hole_options[cross_row_counter].append((hole_id,action_id))
-                        transitions_tuples = product(*transitions_lists)
-                        deadlock_prob = 0
-                        for transitions_tuple in transitions_tuples:
-                            destination_tuple = tuple(map(lambda transition: transition.column, transitions_tuple))
-                            destination = cross_index.get(destination_tuple, None)
-                            value = prod(map(lambda transition: transition.value(), transitions_tuple))
-                            if destination is None or destination == deadlock_state:
-                                deadlock_prob += value
-                            else:
-                                builder.add_next_value(cross_row_counter, destination, value)
-                        if deadlock_prob > 0:
-                            builder.add_next_value(cross_row_counter, deadlock_state, deadlock_prob)
-                        cross_row_counter += 1
-
-        # generate the labelings of the self-composition
-        logger.info("Generating the labels of the self-composition")
-        nr_cross_states = fresh_id
-        cross_state_labeling = stormpy.storage.StateLabeling(nr_cross_states)
-        for label in single_model.labeling.get_labels():
-            assert not label == 'soi', "Soi is a reserved label unfortunately"
-            if label == 'deadlock':
-                pass  # do nothing
-            elif label == 'stop':
-                for index, state_variable in enumerate(state_variables):
-                    cross_label = label + state_variable
-                    cross_state_labeling.add_label(cross_label)
-                    cross_state_labeling.set_states(cross_label,
-                                                    stormpy.BitVector(nr_cross_states, [deadlock_state]))
-
-            elif label == 'init':
-                states = list(single_model.labeling.get_states(label))
-                affected_states_tuples = list(product(states, repeat=nr_replicas))
-                filtered_state_tuples = list(filter(
-                    lambda tup: all(map(lambda t: t[1] in single_model.labeling.get_labels_of_state(tup[t[0]]),
-                                        list(self.state_quant_restrictions.items()))), affected_states_tuples))
-                affected_states = list(
-                    map(lambda tup: cross_index[tup], filtered_state_tuples))
-                cross_state_labeling.add_label(label)
-                cross_state_labeling.set_states(label,
-                                                stormpy.BitVector(nr_cross_states, affected_states))
-            else:
-                affected_states = list(single_model.labeling.get_states(label))
-                for index, state_variable in enumerate(state_variables):
-                    cross_label = label + state_variable
-                    cross_state_labeling.add_label(cross_label)
-                    cross_state_labeling.set_states(cross_label,
-                                                    stormpy.BitVector(nr_cross_states,
-                                                                      [cross_index[tup] for tup in
-                                                                       cross_index if tup[index] in affected_states and cross_index[tup] != deadlock_state]))
-
-        choice_to_action_tuple = cross_choice_to_actions_tuple
-        index_to_product_state = cross_index_to_cross_state
-        cross_transition_matrix = builder.build(overridden_column_count=nr_cross_states)
-        components = stormpy.SparseModelComponents(transition_matrix=cross_transition_matrix,
-                                                   state_labeling=cross_state_labeling,
-                                                   rate_transitions=False)
-
-        # build the self-composition
-        quotient_mdp = stormpy.storage.SparseMdp(components)
-        logger.info(f"Number of states of the self-composition: {quotient_mdp.nr_states}")
+        # build the self-composition between multiple replicase
+        self.build_self_composition(single_model, nr_replicas, state_variables, want_to_export)
 
         # actual parsing of the properties
         logger.info("Checking that we have a single initial state...")
-        assert len(quotient_mdp.initial_states) == 1, f"The self-composed model has {len(quotient_mdp.initial_states)} initial states"
-        logger.info("We have a single initial state now, so no instantiation of the state quantifications will be done")
-        specification = self.parse_specification(relative_error, discount_factor)
+        assert len(self.composed_model.initial_states) == 1, \
+            f"The self-composed model has {len(self.composed_model.initial_states)} initial states"
+        logger.info("We have a single initial state now, so no instantiation of state quantifiers will be done")
+        self.parse_specification(relative_error, discount_factor)
 
-        # constructing the cross-product(s) with the automata for the formulae
-        target_sets = {}
-        single_property = len(specification.stormpy_properties()) == 1
-        assert (export is None) or (export == "drn"), "can export hypermodels only in zipped drn format for the moment"
-        want_to_export = export is not None
+        single_property = len(self.specification.stormpy_properties()) == 1
         assert not (want_to_export and not single_property), "cannot export a model with multiple properties"
-        for index, property in enumerate(specification.stormpy_properties()):
-            if (not property.raw_formula.subformula.is_eventually_formula) or want_to_export:
-                formula = property.raw_formula
-
-                logger.info(f"Generating explicit cross-product for formula: {formula}")
-                if formula.is_reward_operator:
-                    logger.info(f"Refactoring formula to give it to STORM")
-                    rf = str(formula)
-                    formula_re = re.compile(r'^(.*)\[(.*)\]')
-                    match = formula_re.search(rf)
-                    formula = stormpy.parse_properties_without_context(f"Pmax=?[{match.group(2)}]\n")[0]
-                    logger.info(f"Using fictitious formula {formula}")
-
-                #generate the cross-product model
-                product_rep = stormpy.build_product_model(quotient_mdp, formula)
-                new_quotient_mdp = product_rep.product_model
-                p_index_to_p_state = product_rep.product_index_to_product_state
-                # add labels
-                for label in quotient_mdp.labeling.get_labels():
-                    if not (label == 'soi'):
-                        new_quotient_mdp.labeling.add_label(label)
-                logger.info(f"Number of states of the cross-product: {new_quotient_mdp.nr_states}")
-
-                # resetting the initial state
-                assert new_quotient_mdp.labeling.contains_label("soi")
-                initial_states = list(new_quotient_mdp.labeling.get_states("soi"))
-                assert len(initial_states) == 1
-                new_quotient_mdp.labeling.add_label_to_state("init", initial_states[0])
-
-                # resetting target states
-                new_target_sets = {}
-                logger.info(f"Target states of the cross-product: {list(product_rep.accepting_states)}")
-                assert list(product_rep.accepting_states)
-                for accepting_state in list(product_rep.accepting_states):
-                    new_target_sets[accepting_state] = new_target_sets.get(accepting_state, []) + [index]
-
-                # generate the family and the choice_to_hole_option mapping
-                logger.info("Regenerating choice-to-hole-options to adapt to cross-product - family does not change")
-                new_choice_to_hole_options = []
-                new_choice_to_actions_tuple = [] # to export to Inf-JESP
-                new_index_to_product_state = []
-
-                for state in new_quotient_mdp.states:
-                    num_actions = new_quotient_mdp.get_nr_available_actions(state.id)
-                    (mdp_state, sA) = p_index_to_p_state[state.id]
-
-                    if target_sets:
-                        new_target_sets[state.id] = target_sets.get(mdp_state, [])
-                    if not single_property: # resetting labels for next cross products
-                        labels = quotient_mdp.labeling.get_labels_of_state(mdp_state)
-                        for label in labels:
-                            if not (label == 'init'):
-                                new_quotient_mdp.labeling.add_label_to_state(label, state.id)
-
-                    old_index_to_product_state = list(index_to_product_state[mdp_state])
-                    new_index_to_product_state.append(tuple(old_index_to_product_state + [sA]))
-
-                    for offset in range(num_actions):
-                        old_choice = quotient_mdp.get_choice_index(mdp_state, offset)
-                        old_choice_hole_options = choice_to_hole_options[old_choice]
-                        if want_to_export:
-                            if num_actions > 1: # this state has to be mapped to a hole
-                                assert old_choice_hole_options
-                                old_actions_tuple = list(choice_to_action_tuple[old_choice])
-                                old_actions_tuple.append(0)
-                                new_choice_to_actions_tuple.append(tuple(old_actions_tuple))
-                            else:
-                                assert not old_choice_hole_options
-                                new_choice_to_actions_tuple.append(tuple([0 for _ in range(nr_replicas +1)]))
-                        new_choice_to_hole_options.append(old_choice_hole_options)
-
-                # updating the variables
-                target_sets = new_target_sets
-                quotient_mdp = new_quotient_mdp
-                choice_to_hole_options = new_choice_to_hole_options
-                index_to_product_state = new_index_to_product_state
-                if want_to_export:
-                    choice_to_action_tuple = new_choice_to_actions_tuple
-
-        # generate the reward models of the overall cross-product
-        logger.info(f"Generating the reward model of the self-composition")
-        reward_models = {}
-        for name, reward_model in single_model.reward_models.items():
-            assert reward_model.has_state_rewards
-            assert not reward_model.has_state_action_rewards
-            assert not reward_model.has_transition_rewards
-            for index, state_variable in enumerate(state_variables):
-                state_reward = [reward_model.get_state_reward(state_tuple[index]) for state_tuple in index_to_product_state]
-                reward_name = name + state_variable
-                reward_models[reward_name] = stormpy.SparseRewardModel(state_reward)
-
-        if reward_models:
-            components = stormpy.SparseModelComponents(transition_matrix=quotient_mdp.transition_matrix,
-                                                       state_labeling=quotient_mdp.labeling,
-                                                       reward_models=reward_models,
-                                                       rate_transitions=False)
-
-            # build the self-composition
-            quotient_mdp = stormpy.storage.SparseMdp(components)
-
-        # refactor formulae to have only reachability probabilities
-        self.lines = []
-        for index, property in enumerate(specification.stormpy_properties()):
-
-                # refactor the formula
-                formula = property.raw_formula
-                logger.info(f"Refactoring formula: {formula}")
-                rf = str(formula)
-                formula_re = re.compile(r'^(.*)\[(.*)\]')
-                match = formula_re.search(rf)
-                if match is None:
-                    raise Exception(f"Formula is not supported: {rf}!")
-                if not property.raw_formula.subformula.is_eventually_formula or want_to_export:
-                    new_rf = f"{match.group(1)}[F \"target{index}\"]\n"
-                    target_states = [state for state, targetFormulas in target_sets.items() if index in targetFormulas]
-                    logger.info(f"target states for target{index}: {target_states}")
-                    assert target_states
-                    quotient_mdp.labeling.add_label(f"target{index}")
-                    quotient_mdp.labeling.set_states(f"target{index}",
-                                                     stormpy.BitVector(quotient_mdp.nr_states, target_states))
-                else:
-                    new_rf = rf
-                self.lines.append(new_rf)
+        # call STORM construction of DRA
+        self.build_cross_product(single_model, want_to_export, single_property, nr_replicas, state_variables)
 
 
-        specification = self.parse_specification(relative_error, discount_factor)
-        # export the build model
-        sketch_folder = sketch_path.replace("sketch.templ", "")
-        if single_property and want_to_export:
-            file_name = f"{sketch_folder}/model.drn"
-            zipped_file_name = f"{sketch_folder}/model.zip"
-            stormpy.export_to_drn(quotient_mdp, file_name)
-
-            with zipfile.ZipFile(zipped_file_name, 'w', zipfile.ZIP_DEFLATED) as myzip:
-                myzip.write(file_name)
-
-            os.remove(file_name)
-
-            with open(f"{sketch_folder}/helpers.json", "w") as file:
-                helpers = {}
-                # state labeling
-                helpers["state labeling"] = index_to_product_state
-
-                # accepting states of the full model
-                helpers["target states"] = list(quotient_mdp.labeling.get_states('target0'))
-                logger.info(f"setting the helpers target states: {list(quotient_mdp.labeling.get_states('target0'))}")
-
-                # product choice to action tuple
-                helpers["choice labeling"] = choice_to_action_tuple
-
-                json.dump(helpers, file)
-
-            logger.info("hyperExport OK, aborting...")
-            exit(0)
+        # export the model, if required
+        if want_to_export:
+            assert not single_property, "Cannot export a multi-property model, since it is not a Dec-POMDP."
+            self.export_to_drn(single_model, sketch_path)
 
         # generating the coloring
         logger.info("Generating the coloring")
-        coloring = payntbind.synthesis.Coloring(family.family, quotient_mdp.nondeterministic_choice_indices,
-                                                choice_to_hole_options)
+        coloring = payntbind.synthesis.Coloring(family.family, self.composed_model.nondeterministic_choice_indices,
+                                                self.choice_to_hole_options)
 
-        return None, quotient_mdp, specification, family, coloring, None, None
+        return None, self.composed_model, self.specification, family, coloring, None, None
 
