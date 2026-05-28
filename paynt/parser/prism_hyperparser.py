@@ -106,25 +106,25 @@ class PrismHyperParser:
         existential_quantifier = False
         while True:
             state_quant = match.group(1)
-            state_name = match.group(2)
-            sched_name = match.group(3)
+            state_var = match.group(2)
+            sched_var = match.group(3)
 
             # every scheduler variable must be quantified
-            if sched_name not in list(self.sched_quant_dict.keys()):
+            if sched_var not in self.sched_quant_dict:
                 raise Exception(f"a scheduler variable occurs free in the state quantifications: {line}.")
 
             # the implementation of HyperPaynt supports only specifications in conjunctive normal form
             if existential_quantifier and state_quant == "A":
                 raise Exception(f"this nesting E*A* of state quantifications is not allowed: please use conjunctions of disjuctions (A*E*).")
 
-            if state_name in list(self.state_quant_dict.keys()):
-                raise Exception(f"two state variables cannot have the same name: {state_name}")
+            if state_var in self.state_quant_dict:
+                raise Exception(f"two state variables cannot have the same name: {state_var}")
 
             if state_quant == "E":
                 existential_quantifier = True
 
             # add the state quantifier to the dictionary
-            self.state_quant_dict[state_name] = (state_quant, sched_name)
+            self.state_quant_dict[state_var] = (state_quant, sched_var)
 
             # end of state quantifiers
             if match.group(5) == "":
@@ -147,13 +147,14 @@ class PrismHyperParser:
             return
 
         while True:
-            state_name = match.group(1)
+            state_var = match.group(1)
             restriction_label = match.group(2)
-            if state_name not in self.state_quant_dict:
-                raise Exception(f"Trying to restrict a variable not in scope: {state_name}.")
-            replica_number = list(self.state_quant_dict).index(state_name)
+            if state_var not in self.state_quant_dict:
+                raise Exception(f"Trying to restrict a variable not in scope: {state_var}.")
+            # list on a dictionary returns the list of elements in insertion order.
+            replica_number = list(self.state_quant_dict).index(state_var)
             if replica_number in self.state_quant_restrictions:
-                raise Exception(f"Trying to restrict two times the same variable: {state_name}.")
+                raise Exception(f"Trying to restrict two times the same variable: {state_var}.")
 
             # storing this restriction
             self.state_quant_restrictions[replica_number] = restriction_label
@@ -231,7 +232,6 @@ class PrismHyperParser:
         for state in single_model.states:
             obs = single_model.get_observation(state.id)
             obs_name = single_model.observation_valuations.get_string(obs)
-            print(f"Obs: {obs}.\nObs Name: {obs_name}")
             state_name = single_model.state_valuations.get_string(state.id)
 
             num_actions = single_model.get_nr_available_actions(state.id)
@@ -287,8 +287,7 @@ class PrismHyperParser:
                     self.state_to_hole_indexes[index][state.id] = state_holes[sched_name]
         return family
 
-    def build_self_composition(self, single_model, n, state_variables, want_to_export):
-        assert len(self.state_to_hole_indexes) == n
+    def build_self_composition(self, single_model, want_to_export, nr_replicas):
         contains_stop = single_model.labeling.contains_label('stop')
         logger.warning(f"Assuming \"stop\" is a special label to mark deadlock states, "
                        f"and collapsing all deadlock states in a single one. "
@@ -297,7 +296,7 @@ class PrismHyperParser:
         # generate the state set of the self-composition
         # preprocess to avoid thousands of sink states, sc = self-composition
         nr_states = single_model.nr_states
-        state_permutations = list(product(range(nr_states), repeat=n))
+        state_permutations = list(product(range(nr_states), repeat=nr_replicas))
         deadlock_state = None  # the only one we are allowing
         sc_state_to_sc_index = {}
         fresh_id = 0
@@ -367,7 +366,7 @@ class PrismHyperParser:
             if label == "deadlock":
                 pass
             elif label == 'stop':
-                for index, state_variable in enumerate(state_variables):
+                for index, state_variable in enumerate(self.state_quant_dict):
                     sc_label = label + state_variable
                     sc_state_labeling.add_label(sc_label)
                     sc_state_labeling.set_states(sc_label,
@@ -387,7 +386,7 @@ class PrismHyperParser:
                                                 stormpy.BitVector(nr_sc_states, affected_states))
             else:
                 affected_states = list(single_model.labeling.get_states(label))
-                for index, state_variable in enumerate(state_variables):
+                for index, state_variable in enumerate(self.state_quant_dict):
                     sc_label = label + state_variable
                     sc_state_labeling.add_label(sc_label)
                     sc_state_labeling.set_states(sc_label,
@@ -406,9 +405,8 @@ class PrismHyperParser:
         self.composed_model = stormpy.storage.SparseMdp(components)
         logger.info(f"Number of states of the self-composition: {self.composed_model.nr_states}")
 
-    def build_cross_product(self, single_model, want_to_export, single_property, n, state_variables):
-        # constructing the cross-product(s) with the automata for the formulae
-
+    # constructing the cross-product(s) with the automata for the formulae
+    def build_cross_product(self, single_model, want_to_export, single_property):
         for index, property in enumerate(self.specification.stormpy_properties()):
             if (not property.raw_formula.subformula.is_eventually_formula) or want_to_export:
                 formula = property.raw_formula
@@ -448,7 +446,6 @@ class PrismHyperParser:
                 for state in cross_product.states:
                     num_actions = cross_product.get_nr_available_actions(state.id)
                     (mdp_state, sA) = p_index_to_p_state[state.id]
-                    print(f"sA: {sA}")
 
                     # mark this tuple as target for previous formulae
                     if self.target_sets.get(mdp_state):
@@ -468,18 +465,18 @@ class PrismHyperParser:
                         old_choice = self.composed_model.get_choice_index(mdp_state, offset)
                         old_hole_options = self.choice_to_hole_options[old_choice]
                         if want_to_export:
+                            old_actions_tuple = self.choice_to_action_tuple[old_choice]
                             if num_actions > 1:  # this state has to be mapped to a hole
                                 assert old_hole_options
-                                old_actions_tuple = self.choice_to_action_tuple[old_choice]
                                 new_choice_to_actions_tuple.append(old_actions_tuple + (0,))
                             else:
                                 assert not old_hole_options
-                                new_choice_to_actions_tuple.append(tuple([0 for _ in range(n + 1)]))
+                                assert all([action == 0 for action in old_actions_tuple])
+                                new_choice_to_actions_tuple.append(old_actions_tuple + (0,))
                         new_choice_to_hole_options.append(old_hole_options)
 
                 # updating various information
                 # adding target states of this property
-                logger.info(f"Target states of the cross-product: {list(product_rep.accepting_states)}")
                 assert list(product_rep.accepting_states)
                 for accepting_state in list(product_rep.accepting_states):
                     # the state is accepting also for this formula.
@@ -493,13 +490,13 @@ class PrismHyperParser:
                     self.choice_to_action_tuple = new_choice_to_actions_tuple
 
         # generate the reward models of the overall cross-product
-        logger.info(f"Generating the reward model of the self-composition")
         reward_models = {}
         for name, reward_model in single_model.reward_models.items():
+            logger.info(f"Generating the reward model of the self-composition for reward model {name}")
             assert reward_model.has_state_rewards
             assert not reward_model.has_state_action_rewards
             assert not reward_model.has_transition_rewards
-            for index, state_variable in enumerate(state_variables):
+            for index, state_variable in enumerate(self.state_quant_dict):
                 state_reward = [reward_model.get_state_reward(state_tuple[index]) for state_tuple in
                                 self.product_id_to_state_tuple]
                 reward_name = name + state_variable
@@ -512,6 +509,32 @@ class PrismHyperParser:
                                                        rate_transitions=False)
 
             self.composed_model = stormpy.storage.SparseMdp(components)
+
+    def refactor_specification(self, want_to_export):
+        # refactor formulae to have only reachability probabilities
+        self.lines = []
+        for index, property in enumerate(self.specification.stormpy_properties()):
+
+            # refactor the formula
+            formula = property.raw_formula
+            logger.info(f"Refactoring formula: {formula}")
+            rf = str(formula)
+            formula_re = re.compile(r'^(.*)\[(.*)\]')
+            match = formula_re.search(rf)
+            if match is None:
+                raise Exception(f"Formula is not supported: {rf}!")
+            if not property.raw_formula.subformula.is_eventually_formula or want_to_export:
+                new_rf = f"{match.group(1)}[F \"target{index}\"]\n"
+                target_states = [state for state, targetFormulas in self.target_sets.items() if index in targetFormulas]
+                target_state_info = len(target_states) if len(target_states) > 20  else target_states
+                logger.info(f"target states for target{index} (only length is reported if above 20 states): {target_state_info}")
+                assert target_states
+                self.composed_model.labeling.add_label(f"target{index}")
+                self.composed_model.labeling.set_states(f"target{index}",
+                                                        stormpy.BitVector(self.composed_model.nr_states, target_states))
+            else:
+                new_rf = rf
+            self.lines.append(new_rf)
 
     def export_to_drn(self, single_model, sketch_path):
         # export the build model
@@ -547,36 +570,11 @@ class PrismHyperParser:
 
             # accepting states of the full model
             logger.info(
-                f"Setting target states while exporting: {list(self.composed_model.labeling.get_states('target0'))}")
+                f"Setting {len(self.composed_model.labeling.get_states('target0'))} target states while exporting.")
             json.dump(helpers, file)
 
         logger.info("hyperExport OK, aborting...")
         exit(0)
-
-    def refactor_specification(self, want_to_export):
-        # refactor formulae to have only reachability probabilities
-        self.lines = []
-        for index, property in enumerate(self.specification.stormpy_properties()):
-
-            # refactor the formula
-            formula = property.raw_formula
-            logger.info(f"Refactoring formula: {formula}")
-            rf = str(formula)
-            formula_re = re.compile(r'^(.*)\[(.*)\]')
-            match = formula_re.search(rf)
-            if match is None:
-                raise Exception(f"Formula is not supported: {rf}!")
-            if not property.raw_formula.subformula.is_eventually_formula or want_to_export:
-                new_rf = f"{match.group(1)}[F \"target{index}\"]\n"
-                target_states = [state for state, targetFormulas in self.target_sets.items() if index in targetFormulas]
-                logger.info(f"target states for target{index}: {target_states}")
-                assert target_states
-                self.composed_model.labeling.add_label(f"target{index}")
-                self.composed_model.labeling.set_states(f"target{index}",
-                                                        stormpy.BitVector(self.composed_model.nr_states, target_states))
-            else:
-                new_rf = rf
-            self.lines.append(new_rf)
 
     def read_prism(self, sketch_path, properties_path, relative_error, discount_factor, export):
 
@@ -618,7 +616,6 @@ class PrismHyperParser:
         nr_initial_states = len(single_model.initial_states)
         nr_states = single_model.nr_states
         nr_replicas = len(self.state_quant_dict)
-        state_variables = list(self.state_quant_dict.keys())
         logger.info(
             f"The original (non self-composed) model has {nr_initial_states} initial states and {nr_states} states")
         if single_model.is_partially_observable:
@@ -637,7 +634,7 @@ class PrismHyperParser:
         want_to_export = export is not None
 
         # build the self-composition between multiple replicase
-        self.build_self_composition(single_model, nr_replicas, state_variables, want_to_export)
+        self.build_self_composition(single_model, nr_replicas, want_to_export)
 
         # actual parsing of the properties
         logger.info("Checking that we have a single initial state...")
@@ -647,14 +644,16 @@ class PrismHyperParser:
         self.parse_specification(relative_error, discount_factor)
 
         single_property = len(self.specification.stormpy_properties()) == 1
-        assert not (want_to_export and not single_property), "cannot export a model with multiple properties"
-        # call STORM construction of DRA
-        self.build_cross_product(single_model, want_to_export, single_property, nr_replicas, state_variables)
+        # call STORM/SPOT construction of DRA
+        self.build_cross_product(single_model, want_to_export, single_property)
 
+        self.refactor_specification(want_to_export)
+        self.parse_specification(relative_error, discount_factor)
 
         # export the model, if required
         if want_to_export:
-            assert not single_property, "Cannot export a multi-property model, since it is not a Dec-POMDP."
+            assert single_property, "Cannot export a multi-property model, since it is not a Dec-POMDP."
+            logging.info("Exporting model...")
             self.export_to_drn(single_model, sketch_path)
 
         # generating the coloring
