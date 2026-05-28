@@ -217,7 +217,7 @@ class PrismHyperParser:
             properties.append(prop)
 
         self.specification = paynt.verification.property.Specification(properties)
-        logger.info(f"found the following specification: {self.specification}")
+        logger.info(f"Found the following specification: {self.specification}")
         assert not self.specification.has_double_optimality, "did not expect double-optimality property"
 
     def generate_partially_observable_family(self, single_model, nr_replicas):
@@ -375,7 +375,7 @@ class PrismHyperParser:
             # reserved label for initial states
             elif label == 'init':
                 states = list(single_model.labeling.get_states(label))
-                affected_states_tuples = list(product(states, repeat=n))
+                affected_states_tuples = list(product(states, repeat=nr_replicas))
                 filtered_state_tuples = list(filter(
                     lambda tup: all(map(lambda t: t[1] in single_model.labeling.get_labels_of_state(tup[t[0]]),
                                         list(self.state_quant_restrictions.items()))), affected_states_tuples))
@@ -413,12 +413,12 @@ class PrismHyperParser:
 
                 logger.info(f"Generating explicit cross-product for formula: {formula}")
                 if formula.is_reward_operator:
-                    logger.info(f"Refactoring formula to give it to STORM")
+                    logger.info(f"Refactoring current formula to give it to STORM to build the DRA cross-product.")
                     rf = str(formula)
                     formula_re = re.compile(r'^(.*)\[(.*)\]')
                     match = formula_re.search(rf)
                     formula = stormpy.parse_properties_without_context(f"Pmax=?[{match.group(2)}]\n")[0]
-                    logger.info(f"Using fictitious formula {formula}")
+                    logger.info(f"Using fictitious formula: {formula}")
 
                 # generate the cross-product model
                 product_rep = stormpy.build_product_model(self.composed_model, formula)
@@ -570,7 +570,7 @@ class PrismHyperParser:
 
             # accepting states of the full model
             logger.info(
-                f"Setting {len(self.composed_model.labeling.get_states('target0'))} target states while exporting.")
+                f"Setting {len(list(self.composed_model.labeling.get_states('target0')))} target states while exporting.")
             json.dump(helpers, file)
 
         logger.info("hyperExport OK, aborting...")
@@ -634,7 +634,7 @@ class PrismHyperParser:
         want_to_export = export is not None
 
         # build the self-composition between multiple replicase
-        self.build_self_composition(single_model, nr_replicas, want_to_export)
+        self.build_self_composition(single_model, want_to_export, nr_replicas)
 
         # actual parsing of the properties
         logger.info("Checking that we have a single initial state...")
