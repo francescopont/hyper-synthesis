@@ -415,13 +415,6 @@ class PrismHyperParser:
                 formula = property.raw_formula
 
                 logger.info(f"Generating explicit cross-product for formula: {formula}")
-                if formula.is_reward_operator:
-                    logger.info(f"Refactoring current formula to give it to STORM to build the DRA cross-product.")
-                    rf = str(formula)
-                    formula_re = re.compile(r'^(.*)\[(.*)\]')
-                    match = formula_re.search(rf)
-                    formula = stormpy.parse_properties_without_context(f"Pmax=?[{match.group(2)}]\n")[0]
-                    logger.info(f"Using fictitious formula: {formula}")
 
                 # generate the cross-product model
                 stormpy.set_loglevel_debug()
