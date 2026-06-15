@@ -424,7 +424,9 @@ class PrismHyperParser:
                     logger.info(f"Using fictitious formula: {formula}")
 
                 # generate the cross-product model
+                stormpy.set_loglevel_debug()
                 product_rep = stormpy.build_product_model(self.composed_model, formula)
+                stormpy.set_loglevel_trace()
                 cross_product = product_rep.product_model
                 p_index_to_p_state = product_rep.product_index_to_product_state
                 # add labels
