@@ -224,6 +224,9 @@ class PrismHyperParser:
         family = paynt.family.family.Family()
         self.state_to_hole_indexes = [{} for _ in range(nr_replicas)]
         assert single_model.has_observation_valuations, "Observations are not named."
+        logger.info(f"Number of observations of the input model: {single_model.nr_observations}")
+        logger.info(f"Observations: {single_model.observations}")
+        logger.info(f"Observation valuations: {single_model.observation_valuations}")
         assert single_model.model_type == stormpy.ModelType.POMDP
         contains_stop = single_model.labeling.contains_label('stop')
 
@@ -610,6 +613,7 @@ class PrismHyperParser:
         builder_options.set_build_observation_valuations(True)
         builder_options.set_build_all_labels(True)
         builder_options.set_build_choice_labels(True)
+        builder_options.set_build_observation_valuations(True)
 
         # building the given model as it is
         single_model = stormpy.build_sparse_model_with_options(prism, builder_options)
