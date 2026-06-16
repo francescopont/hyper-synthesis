@@ -417,9 +417,9 @@ class PrismHyperParser:
                 logger.info(f"Generating explicit cross-product for formula: {formula}")
 
                 # generate the cross-product model
-                stormpy.set_loglevel_debug()
+                #stormpy.set_loglevel_debug()
                 product_rep = stormpy.build_product_model(self.composed_model, formula)
-                stormpy.set_loglevel_trace()
+                #stormpy.set_loglevel_trace()
                 cross_product = product_rep.product_model
                 p_index_to_p_state = product_rep.product_index_to_product_state
                 # add labels
@@ -475,10 +475,8 @@ class PrismHyperParser:
 
                 # updating various information
                 # adding target states of this property
-                assert list(product_rep.accepting_states)
-                for accepting_state in list(product_rep.accepting_states):
-                    # the state is accepting also for this formula.
-                    new_target_sets[accepting_state] = new_target_sets.get(accepting_state, []) + [index]
+                accepting_state = product_rep.accepting_state
+                new_target_sets[accepting_state] = new_target_sets.get(accepting_state, []) + [index]
                 self.target_sets = new_target_sets
 
                 self.composed_model = cross_product
@@ -524,9 +522,8 @@ class PrismHyperParser:
             if not property.raw_formula.subformula.is_eventually_formula or want_to_export:
                 new_rf = f"{match.group(1)}[F \"target{index}\"]\n"
                 target_states = [state for state, targetFormulas in self.target_sets.items() if index in targetFormulas]
-                target_state_info = len(target_states) if len(target_states) > 20  else target_states
-                logger.info(f"target states for target{index} (only length is reported if above 20 states): {target_state_info}")
-                assert target_states
+                assert len(target_states) == 1
+                logger.info(f"Target state for target{index}: {target_states}")
                 self.composed_model.labeling.add_label(f"target{index}")
                 self.composed_model.labeling.set_states(f"target{index}",
                                                         stormpy.BitVector(self.composed_model.nr_states, target_states))
