@@ -29,6 +29,7 @@ timeout=3600
 # workspace settings
 SYNTHESIS=`pwd`
 paynt_exe="./paynt.py"
+opt_exe="./opt-script.py"
 
 # ------------------------------------------------------------------------------
 # functions
@@ -37,21 +38,38 @@ function paynt() {
     local project="--project $1"
     local method="--method $2"
 
-    local paynt_call="python3 ${paynt_exe} ${project} ${method} ${param} --hyper"
+    local paynt_call="python3 ${paynt_exe} ${project} ${method} ${param} --hyper --optimum-threshold=$3"
+    local opt_call="python3 ${opt_exe} --input ${log_file} --dir $1"
     echo \$ ${paynt_call}
     eval timeout ${timeout} ${paynt_call} >> ${log_file}
+    echo \$ ${opt_call}
+    eval ${opt_call}
 }
 
 # empty the current content of the log file
 #rm -rf $log_dir
 #mkdir $log_dir
-touch $log_file
+#touch $log_file
 
 cwd=$(pwd)
 cd $projects_dir
-dirs=$(find . -type d -exec sh -c '(ls -p "{}"|grep />/dev/null)||echo "{}"' \;)
+
+# find subdirectories that do not contain subdirectories, sort them, strip leading ./
+dirs=$(find . -type d -exec sh -c '(ls -p "{}"|grep />/dev/null)||echo "{}"' \; | sort -V | cut -c 3-)
+echo $dirs
+echo "Start running experiments."
 cd $cwd
 for d in $dirs; do
-  paynt "${projects_dir}/${d}" $method
+  opt="0.000"
+  opt_file="${projects_dir}/${d}/opt-temp.txt"
+  if [ -f $opt_file ]; then
+    echo "File $opt_file exists."
+     opt=$(<"$opt_file")
+  else
+     echo "File $opt_file does not exist."
+     opt="0.000"
+  fi
+  paynt "${projects_dir}/${d}" $method $opt
+
 done
 
