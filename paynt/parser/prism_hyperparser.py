@@ -411,79 +411,85 @@ class PrismHyperParser:
     # constructing the cross-product(s) with the automata for the formulae
     def build_cross_product(self, single_model, want_to_export, single_property):
         for index, property in enumerate(self.specification.stormpy_properties()):
-            if (not property.raw_formula.subformula.is_eventually_formula) or want_to_export:
-                formula = property.raw_formula
+            formula = property.raw_formula
 
-                logger.info(f"Generating explicit cross-product for formula: {formula}")
+            # using fictitious formula, because Stormpy for the moment accepts only probability operator formulae.
+            if formula.is_reward_operator:
+                rf = str(formula)
+                formula_re = re.compile(r'^(.*)\[(.*)\]')
+                match = formula_re.search(rf)
+                formula = stormpy.parse_properties_without_context(f"Pmax=?[{match.group(2)}]\n")[0]
 
-                # generate the cross-product model
-                #stormpy.set_loglevel_debug()
-                product_rep = stormpy.build_product_model(self.composed_model, formula)
-                #stormpy.set_loglevel_trace()
-                cross_product = product_rep.product_model
-                p_index_to_p_state = product_rep.product_index_to_product_state
-                # add labels
-                for label in self.composed_model.labeling.get_labels():
-                    if not (label == 'soi'):
-                        cross_product.labeling.add_label(label)
-                logger.info(f"Number of states of the cross-product: {cross_product.nr_states}")
+            # generate the cross-product model
+            stormpy.set_loglevel_debug()
+            stormpy.set_loglevel_trace()
+            print(f"Type of model: {type(self.composed_model)}")
+            print(f"Type of formula: {type(formula)}")
+            product_rep = stormpy.build_product_model(self.composed_model, formula)
+            cross_product = product_rep.product_model
+            p_index_to_p_state = product_rep.product_index_to_product_state
+            # add labels
+            for label in self.composed_model.labeling.get_labels():
+                if not (label == 'soi'):
+                    cross_product.labeling.add_label(label)
+            logger.info(f"Number of states of the cross-product: {cross_product.nr_states}")
 
-                # resetting the initial state
-                assert cross_product.labeling.contains_label("soi")
-                initial_states = list(cross_product.labeling.get_states("soi"))
-                assert len(initial_states) == 1
-                cross_product.labeling.add_label_to_state("init", initial_states[0])
+            # resetting the initial state
+            assert cross_product.labeling.contains_label("soi")
+            initial_states = list(cross_product.labeling.get_states("soi"))
+            assert len(initial_states) == 1
+            cross_product.labeling.add_label_to_state("init", initial_states[0])
 
-                # generate the family and the choice_to_hole_option mapping
-                logger.info("Regenerating choice-to-hole-options to adapt to cross-product - family does not change")
-                new_choice_to_hole_options = []
-                new_choice_to_actions_tuple = []  # to export to Inf-JESP
-                new_product_id_to_state_tuple = []
-                new_target_sets = {}
+            # generate the family and the choice_to_hole_option mapping
+            logger.info("Regenerating choice-to-hole-options to adapt to cross-product - family does not change")
+            new_choice_to_hole_options = []
+            new_choice_to_actions_tuple = []  # to export to Inf-JESP
+            new_product_id_to_state_tuple = []
+            new_target_sets = {}
 
-                for state in cross_product.states:
-                    num_actions = cross_product.get_nr_available_actions(state.id)
-                    (mdp_state, sA) = p_index_to_p_state[state.id]
+            for state in cross_product.states:
+                num_actions = cross_product.get_nr_available_actions(state.id)
+                (mdp_state, sA) = p_index_to_p_state[state.id]
 
-                    # mark this tuple as target for previous formulae
-                    if self.target_sets.get(mdp_state):
-                        new_target_sets[state.id] = self.target_sets[mdp_state]
+                # mark this tuple as target for previous formulae
+                if self.target_sets.get(mdp_state):
+                    new_target_sets[state.id] = self.target_sets[mdp_state]
 
-                    # readding labels for next cross products, each cross-product needs its own.
-                    if not single_property:
-                        labels = self.composed_model.labeling.get_labels_of_state(mdp_state)
-                        for label in labels:
-                            if not (label == 'init'):
-                                cross_product.labeling.add_label_to_state(label, state.id)
+                # readding labels for next cross products, each cross-product needs its own.
+                if not single_property:
+                    labels = self.composed_model.labeling.get_labels_of_state(mdp_state)
+                    for label in labels:
+                        if not (label == 'init'):
+                            cross_product.labeling.add_label_to_state(label, state.id)
 
-                    old_state_tuple = self.product_id_to_state_tuple[mdp_state]
-                    new_product_id_to_state_tuple.append(old_state_tuple + (sA,))
+                old_state_tuple = self.product_id_to_state_tuple[mdp_state]
+                new_product_id_to_state_tuple.append(old_state_tuple + (sA,))
 
-                    for offset in range(num_actions):
-                        old_choice = self.composed_model.get_choice_index(mdp_state, offset)
-                        old_hole_options = self.choice_to_hole_options[old_choice]
-                        if want_to_export:
-                            old_actions_tuple = self.choice_to_action_tuple[old_choice]
-                            if num_actions > 1:  # this state has to be mapped to a hole
-                                assert old_hole_options
-                                new_choice_to_actions_tuple.append(old_actions_tuple + (0,))
-                            else:
-                                assert not old_hole_options
-                                assert all([action == 0 for action in old_actions_tuple])
-                                new_choice_to_actions_tuple.append(old_actions_tuple + (0,))
-                        new_choice_to_hole_options.append(old_hole_options)
+                for offset in range(num_actions):
+                    old_choice = self.composed_model.get_choice_index(mdp_state, offset)
+                    old_hole_options = self.choice_to_hole_options[old_choice]
+                    if want_to_export:
+                        old_actions_tuple = self.choice_to_action_tuple[old_choice]
+                        if num_actions > 1:  # this state has to be mapped to a hole
+                            assert old_hole_options
+                            new_choice_to_actions_tuple.append(old_actions_tuple + (0,))
+                        else:
+                            assert not old_hole_options
+                            assert all([action == 0 for action in old_actions_tuple])
+                            new_choice_to_actions_tuple.append(old_actions_tuple + (0,))
+                    new_choice_to_hole_options.append(old_hole_options)
 
-                # updating various information
-                # adding target states of this property
-                accepting_state = product_rep.accepting_state
-                new_target_sets[accepting_state] = new_target_sets.get(accepting_state, []) + [index]
-                self.target_sets = new_target_sets
+            # updating various information
+            # adding target states of this property
+            accepting_state = product_rep.accepting_state
+            new_target_sets[accepting_state] = new_target_sets.get(accepting_state, []) + [index]
+            self.target_sets = new_target_sets
 
-                self.composed_model = cross_product
-                self.choice_to_hole_options = new_choice_to_hole_options
-                self.product_id_to_state_tuple = new_product_id_to_state_tuple
-                if want_to_export:
-                    self.choice_to_action_tuple = new_choice_to_actions_tuple
+            self.composed_model = cross_product
+            self.choice_to_hole_options = new_choice_to_hole_options
+            self.product_id_to_state_tuple = new_product_id_to_state_tuple
+            if want_to_export:
+                self.choice_to_action_tuple = new_choice_to_actions_tuple
 
         # generate the reward models of the overall cross-product
         reward_models = {}
