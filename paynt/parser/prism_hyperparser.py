@@ -225,8 +225,6 @@ class PrismHyperParser:
         self.state_to_hole_indexes = [{} for _ in range(nr_replicas)]
         assert single_model.has_observation_valuations, "Observations are not named."
         logger.info(f"Number of observations of the input model: {single_model.nr_observations}")
-        logger.info(f"Observations: {single_model.observations}")
-        logger.info(f"Observation valuations: {single_model.observation_valuations}")
         assert single_model.model_type == stormpy.ModelType.POMDP
         contains_stop = single_model.labeling.contains_label('stop')
 
@@ -413,17 +411,15 @@ class PrismHyperParser:
         for index, property in enumerate(self.specification.stormpy_properties()):
             formula = property.raw_formula
 
-            if property.raw_formula.subformula.is_eventually_formula:
-                target_boolean_formula = property.raw_formula.subformula.subformula
+            if formula.is_reward_operator:
+                # Reward operator only support reachability temporal properties.
+                # Also, the construction of the cross-product breaks reward computation at the moment.
+                target_boolean_formula = formula.subformula.subformula
                 mc_result = stormpy.model_checking(self.composed_model, target_boolean_formula)
                 satisfying_states = mc_result.get_truth_values()
                 for state in satisfying_states:
                     self.target_sets[state] = self.target_sets.get(state, []) + [index]
             else:
-                assert not formula.is_reward_operator, "Reward operator only support reachability temporal properties."
-                # generate the cross-product model
-                #stormpy.set_loglevel_debug()
-                #stormpy.set_loglevel_trace()
                 product_rep = stormpy.build_product_model(self.composed_model, formula)
                 cross_product = product_rep.product_model
 
@@ -524,7 +520,7 @@ class PrismHyperParser:
             match = formula_re.search(rf)
             if match is None:
                 raise Exception(f"Formula is not supported: {rf}!")
-            if not property.raw_formula.subformula.is_eventually_formula or want_to_export:
+            if not formula.is_reward_operator:
                 new_rf = f"{match.group(1)}[F \"target{index}\"]\n"
                 target_states = [state for state, targetFormulas in self.target_sets.items() if index in targetFormulas]
                 assert len(target_states) == 1
