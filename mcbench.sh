@@ -37,12 +37,16 @@ function paynt() {
     # argument settings
     local project="--project $1"
     local method="--method $2"
+    paynt_call=''
 
-    local paynt_call="python3 ${paynt_exe} ${project} ${method} ${param} --hyper --optimum-threshold=$3"
+    if [ "$#" -eq 3 ]; then
+      paynt_call="python3 ${paynt_exe} ${project} ${method} ${param} --hyper --optimum-threshold=$3"
+    else
+       paynt_call="python3 ${paynt_exe} ${project} ${method} ${param} --hyper"
+    fi
     local opt_call="python3 ${opt_exe} --input ${log_file} --dir $1"
     echo \$ ${paynt_call}
     eval timeout ${timeout} ${paynt_call} >> ${log_file}
-    echo \$ ${opt_call}
     eval ${opt_call}
 }
 
@@ -56,20 +60,17 @@ cd $projects_dir
 
 # find subdirectories that do not contain subdirectories, sort them, strip leading ./
 dirs=$(find . -type d -exec sh -c '(ls -p "{}"|grep />/dev/null)||echo "{}"' \; | sort -V | cut -c 3-)
-echo $dirs
 echo "Start running experiments."
 cd $cwd
 for d in $dirs; do
-  opt="0.000"
   opt_file="${projects_dir}/${d}/opt-temp.txt"
   if [ -f $opt_file ]; then
-    echo "File $opt_file exists."
      opt=$(<"$opt_file")
+     paynt "${projects_dir}/${d}" $method $opt
   else
-     echo "File $opt_file does not exist."
-     opt="0.000"
+     paynt "${projects_dir}/${d}" $method
   fi
-  paynt "${projects_dir}/${d}" $method $opt
+
 
 done
 

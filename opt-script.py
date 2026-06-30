@@ -32,13 +32,11 @@ if __name__ == '__main__':
             else:
                 raise "Cannot find the optimum."
 
-    print(f"Identified optimum {opt} for experiment {name}")
     # propagate optimum
     memfolders = [f"{name}+mem", f"{name}XX"]
     for memfolder in memfolders:
         if os.path.isdir(memfolder):
             output_path = f"{memfolder}/opt-temp.txt"
-            print(f"Propagating optimum {opt} to file {output_path}.")
             with open(output_path, 'w', newline='') as f:
                 f.write(opt)
         else:

@@ -91,8 +91,6 @@ def collect_results(path):
                     "time": time,
                     "opt": opt,
                 }
-                #print(f"New record collected: {record}")
-                print(f"Name: {name}")
                 results.append(record)
                 name = None
                 d_size = None
@@ -106,7 +104,6 @@ def collect_results(path):
 
     # last experiment does not have a new one
     assert name is not None, f"name: {name}"
-    print(f"Name: {name}")
     record = {
         "name": name,
         "nr_states": nr_states,
@@ -128,14 +125,12 @@ def sorting_criterion(record):
 
 def to_list(results, key_map_list):
     results.sort(key=sorting_criterion)
-    print(f"Sorted results: {results}")
     return [[mapf(r[key]) for key, mapf in key_map_list] for r in results]
 
 
 if __name__ == '__main__':
     argp = argparse.ArgumentParser()
     argp.add_argument('--input', type=str, help="Input Log file.")
-    argp.add_argument('--output', type=str, help='Output .csv file')
     args = argp.parse_args()
 
     print(f'Collecting benchmark results...')
@@ -143,10 +138,11 @@ if __name__ == '__main__':
 
     key_list = ['name', 'nr_states', 'nr_observations', 'nr_holes', 'design_space', 'bound', 'd_size', 'time', 'opt']
     results_matrix = to_list(results, list(map(lambda k: (k, lambda x: x), key_list)))
-    header = ["Name", "|M|", "|O|", "H", "|DS|", "b", "|D|", "t", "opt"]
+    header = ["Name", "|M|", "|O|", "|H|", "|DS|", "b", "|D|", "t", "opt"]
 
     # store results somewhere
-    with open(args.output, 'w', newline='') as f:
+    base = os.path.splitext(args.input)[0]
+    with open(f"{base}.csv", 'w', newline='') as f:
             cw = csv.writer(f)
             cw.writerow(header)
             cw.writerows(results_matrix)
