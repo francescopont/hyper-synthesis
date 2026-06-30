@@ -1,0 +1,5 @@
+ES sched0 ES sched1 ES sched2
+A s0(sched0) A s1(sched1) A s2(sched2)
+Restrict s0 start0 Restrict s1 start1 Restrict s2 start2
+// here we are saying that they must arrive in order (s2,s1,s0)
+Pmax=? [(F ( !"stops0" & "treasures0")) & (F (!"stops1" & "treasures1")) & (F (!"stops2" & "treasures2")) & (G (( !"treasures0" | ("treasures1" & "treasures2")) & (!"treasures1" | "treasures2")))]
