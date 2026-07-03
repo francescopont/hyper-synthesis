@@ -30,7 +30,7 @@ if __name__ == '__main__':
             if optimum_match is not None:
                 opt = optimum_match.group(1)
             else:
-                raise "Cannot find the optimum."
+                raise Exception(f"Cannot find the optimum: {line}")
 
     # propagate optimum
     memfolders = [f"{name}+mem", f"{name}XX"]

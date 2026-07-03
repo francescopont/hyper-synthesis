@@ -67,6 +67,7 @@ for d in $dirs; do
   if [ -f $opt_file ]; then
      opt=$(<"$opt_file")
      paynt "${projects_dir}/${d}" $method $opt
+     rm "${opt_file}"
   else
      paynt "${projects_dir}/${d}" $method
   fi
