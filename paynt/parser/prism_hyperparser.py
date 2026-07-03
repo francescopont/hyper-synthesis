@@ -227,6 +227,11 @@ class PrismHyperParser:
         logger.info(f"Number of observations of the input model: {single_model.nr_observations}")
         assert single_model.model_type == stormpy.ModelType.POMDP
         contains_stop = single_model.labeling.contains_label('stop')
+        logger.warning(f"Assuming \"stop\" is a special label to mark deadlock states, "
+                       f"and collapsing all deadlock states in a single one. "
+                       f"Please change it to another label if this is not the intended meaning.")
+        registered_states = set()
+        fail_state = None
 
         holes_dict = {}  # hole name -> hole index
 
@@ -238,8 +243,6 @@ class PrismHyperParser:
             num_actions = single_model.get_nr_available_actions(state.id)
             option_labels = []
             if num_actions > 1:
-                if contains_stop:
-                    assert not single_model.labeling.has_state_label('stop', state)
                 for offset in range(num_actions):
                     choice = single_model.get_choice_index(state, offset)
                     label = single_model.choice_labeling.get_labels_of_choice(choice)
@@ -261,19 +264,36 @@ class PrismHyperParser:
                 for index, (_, sched_name) in enumerate(self.state_quant_dict.values()):
                     self.state_to_hole_indexes[index][state.id] = state_holes[sched_name]
 
-        return family
+            if contains_stop:
+                if not single_model.labeling.has_state_label('stop', state):
+                    registered_states.add(state.id)
+                else:
+                    # the fail state must go to itself...
+                    assert len(state.actions) == 1
+                    for action in state.actions:
+                        assert len(action.transitions) == 1
+                        for transition in action.transitions:
+                            assert transition.value() == 1 and transition.column == state.id
+                    if fail_state is None:
+                        registered_states.add(state.id)
+                        fail_state = state.id
+
+        return family, registered_states, fail_state
 
     def generate_locally_fully_observable_family(self, single_model, nr_replicas):
         family = paynt.family.family.Family()
         self.state_to_hole_indexes = [{} for _ in range(nr_replicas)]
         contains_stop = single_model.labeling.contains_label('stop')
+        logger.warning(f"Assuming \"stop\" is a special label to mark deadlock states, "
+                       f"and collapsing all deadlock states in a single one. "
+                       f"Please change it to another label if this is not the intended meaning.")
+        registered_states = set()
+        fail_state = None
         for state in single_model.states:
             state_name = single_model.state_valuations.get_string(state.id)
             num_actions = single_model.get_nr_available_actions(state.id)
             option_labels = []
             if num_actions > 1:
-                if contains_stop:
-                    assert not single_model.labeling.has_state_label('stop', state)
                 for offset in range(num_actions):
                     choice = single_model.get_choice_index(state, offset)
                     label = single_model.choice_labeling.get_labels_of_choice(choice)
@@ -286,31 +306,40 @@ class PrismHyperParser:
                     state_holes[sched_name] = hole_index
                 for index, (_, sched_name) in enumerate(self.state_quant_dict.values()):
                     self.state_to_hole_indexes[index][state.id] = state_holes[sched_name]
-        return family
 
-    def build_self_composition(self, single_model, want_to_export, nr_replicas):
-        contains_stop = single_model.labeling.contains_label('stop')
-        logger.warning(f"Assuming \"stop\" is a special label to mark deadlock states, "
-                       f"and collapsing all deadlock states in a single one. "
-                       f"Please change it to another label if this is not the intended meaning.")
+            if contains_stop:
+                if not single_model.labeling.has_state_label('stop', state):
+                    registered_states.add(state.id)
+                else:
+                    # the fail state must go to itself...
+                    assert len(state.actions) == 1
+                    for action in state.actions:
+                        assert len(action.transitions) == 1
+                        for transition in action.transitions:
+                            assert transition.value() == 1 and transition.column == state.id
+                    if fail_state is None:
+                        registered_states.add(state.id)
+                        fail_state = state.id
+
+        return family, registered_states, fail_state
+
+    def build_self_composition(self, single_model, want_to_export, nr_replicas, registered_states, fail_state):
 
         # generate the state set of the self-composition
         # preprocess to avoid thousands of sink states, sc = self-composition
         nr_states = single_model.nr_states
-        state_permutations = list(product(range(nr_states), repeat=nr_replicas))
-        deadlock_state = None  # the only one we are allowing
+        if fail_state is not None:
+            state_permutations = list(product(list(registered_states), repeat=nr_replicas))
+            deadlock_state = fail_state  # the only one we are allowing
+        else:
+            state_permutations = list(product(range(nr_states), repeat=nr_replicas))
+            deadlock_state = None
+
         sc_state_to_sc_index = {}
         fresh_id = 0
         for states_tuple in state_permutations:
-            states = list(map(lambda id: single_model.states[id], states_tuple))
-            is_deadlock = contains_stop and any(
-                map(lambda state: single_model.labeling.has_state_label('stop', state), states))
-            if not is_deadlock or deadlock_state is None:
-                # register this state
-                sc_state_to_sc_index[states_tuple] = fresh_id
-                if is_deadlock:
-                    deadlock_state = fresh_id
-                fresh_id += 1
+            sc_state_to_sc_index[states_tuple] = fresh_id
+            fresh_id += 1
 
         # generate the transition matrix of the self-composition
         logger.info(f"generating the transition system of the self-composition")
@@ -320,43 +349,29 @@ class PrismHyperParser:
         for states_tuple in state_permutations:
             # generate the state in the cross product associated with this tuple
             states = list(map(lambda id: single_model.states[id], states_tuple))
-            sc_state = sc_state_to_sc_index.get(states_tuple, None)
-            if sc_state is not None:
-                self.product_id_to_state_tuple.append(states_tuple)
-                if sc_state == deadlock_state:  # the deadlock state goes to itself
-                    builder.new_row_group(sc_row_counter)
-                    self.choice_to_hole_options.append([])
-                    if want_to_export:
-                        self.choice_to_action_tuple.append(tuple([0 for _ in states_tuple]))
-                    builder.add_next_value(sc_row_counter, deadlock_state, 1)
-                    sc_row_counter += 1
-
-                else:
-                    actions_lists = list(map(lambda id: range(single_model.get_nr_available_actions(id)), states_tuple))
-                    actions_tuples = product(*actions_lists) # all the available tuples of actions of the tuple of states
-                    builder.new_row_group(sc_row_counter)
-                    for actions_tuple in actions_tuples:
-                        self.choice_to_hole_options.append([])
-                        self.choice_to_action_tuple.append(actions_tuple)
-                        transitions_lists = [states[index].actions[id].transitions for index, id in
-                                             enumerate(actions_tuple)]
-                        for (index, action_id) in enumerate(actions_tuple):
-                            hole_id = self.state_to_hole_indexes[index].get(states_tuple[index], None)
-                            if hole_id is not None:  # if it is None, then there is no hole associated with this state
-                                self.choice_to_hole_options[sc_row_counter].append((hole_id, action_id))
-                        transitions_tuples = product(*transitions_lists)
-                        deadlock_prob = 0
-                        for transitions_tuple in transitions_tuples:
-                            destination_tuple = tuple(map(lambda transition: transition.column, transitions_tuple))
-                            destination = sc_state_to_sc_index.get(destination_tuple, None)
-                            value = prod(map(lambda transition: transition.value(), transitions_tuple))
-                            if destination is None or destination == deadlock_state:
-                                deadlock_prob += value
-                            else:
-                                builder.add_next_value(sc_row_counter, destination, value)
-                        if deadlock_prob > 0:
-                            builder.add_next_value(sc_row_counter, deadlock_state, deadlock_prob)
-                        sc_row_counter += 1
+            actions_lists = list(map(lambda id: range(single_model.get_nr_available_actions(id)), states_tuple))
+            actions_tuples = product(*actions_lists) # all the available tuples of actions of the tuple of states
+            builder.new_row_group(sc_row_counter)
+            self.product_id_to_state_tuple.append(states_tuple)
+            for actions_tuple in actions_tuples:
+                self.choice_to_hole_options.append([])
+                self.choice_to_action_tuple.append(actions_tuple)
+                transitions_lists = [states[index].actions[id].transitions for index, id in
+                                     enumerate(actions_tuple)]
+                for (index, action_id) in enumerate(actions_tuple):
+                    hole_id = self.state_to_hole_indexes[index].get(states_tuple[index], None)
+                    if hole_id is not None:  # if it is None, then there is no hole associated with this state
+                        self.choice_to_hole_options[sc_row_counter].append((hole_id, action_id))
+                transitions_tuples = product(*transitions_lists)
+                transition_dict = {}
+                for transitions_tuple in transitions_tuples:
+                    destination_tuple = tuple(map(lambda transition: transition.column if transition.column in registered_states else fail_state, transitions_tuple))
+                    destination = sc_state_to_sc_index[destination_tuple]
+                    value = prod(map(lambda transition: transition.value(), transitions_tuple))
+                    transition_dict[destination] = transition_dict.get(destination, 0) + value
+                for destination, value in transition_dict.items():
+                    builder.add_next_value(sc_row_counter, destination, value)
+                sc_row_counter += 1
 
         # generate the labelings of the self-composition
         logger.info("Generating the labels of the self-composition")
@@ -371,14 +386,17 @@ class PrismHyperParser:
                     sc_label = label + state_variable
                     sc_state_labeling.add_label(sc_label)
                     sc_state_labeling.set_states(sc_label,
-                                                    stormpy.BitVector(nr_sc_states, [deadlock_state]))
+                                                 stormpy.BitVector(nr_sc_states,
+                                                                   [sc_state_to_sc_index[tup] for tup in
+                                                                    sc_state_to_sc_index if
+                                                                    tup[index] == deadlock_state]))
 
             # reserved label for initial states
             elif label == 'init':
                 states = list(single_model.labeling.get_states(label))
                 affected_states_tuples = list(product(states, repeat=nr_replicas))
                 filtered_state_tuples = list(filter(
-                    lambda tup: all(map(lambda t: t[1] in single_model.labeling.get_labels_of_state(tup[t[0]]),
+                    lambda tup: all(map(lambda res_item: res_item[1] in single_model.labeling.get_labels_of_state(tup[res_item[0]]),
                                         list(self.state_quant_restrictions.items()))), affected_states_tuples))
                 affected_states = list(
                     map(lambda tup: sc_state_to_sc_index[tup], filtered_state_tuples))
@@ -395,7 +413,7 @@ class PrismHyperParser:
                                                                       [sc_state_to_sc_index[tup] for tup in
                                                                        sc_state_to_sc_index if
                                                                        tup[index] in affected_states and
-                                                                       sc_state_to_sc_index[tup] != deadlock_state]))
+                                                                       tup[index] != deadlock_state]))
 
         sc_transition_matrix = builder.build(overridden_column_count=nr_sc_states)
         components = stormpy.SparseModelComponents(transition_matrix=sc_transition_matrix,
@@ -621,9 +639,9 @@ class PrismHyperParser:
         # generate the family of holes (aka parameters, schedulers' choices...)
         logger.info(f"Generating the family...")
         if single_model.is_partially_observable:
-            family = self.generate_partially_observable_family(single_model, nr_replicas)
+            family, registered_states, fail_state = self.generate_partially_observable_family(single_model, nr_replicas)
         else:
-            family = self.generate_locally_fully_observable_family(single_model, nr_replicas)
+            family, registered_states, fail_state = self.generate_locally_fully_observable_family(single_model, nr_replicas)
         logger.info(f"Current family has {family.num_holes} holes")
 
         # check if export is needed
@@ -631,7 +649,7 @@ class PrismHyperParser:
         want_to_export = export is not None
 
         # build the self-composition between multiple replicase
-        self.build_self_composition(single_model, want_to_export, nr_replicas)
+        self.build_self_composition(single_model, want_to_export, nr_replicas, registered_states, fail_state)
 
         # actual parsing of the properties
         logger.info("Checking that we have a single initial state...")
