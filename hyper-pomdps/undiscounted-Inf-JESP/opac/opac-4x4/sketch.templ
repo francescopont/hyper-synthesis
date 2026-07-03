@@ -15,10 +15,10 @@ formula down = (x=0&y=1)|(x=2&y=1)|(x=3&y=1)|(x=0&y=2)|(x=2&y=2)|(x=0&y=3)|(x=1&
 
 formula left = (x=1&y=0)|(x=3&y=0)|(x=1&y=1)|(x=3&y=1)|(x=1&y=2)|(x=2&y=2)|(x=3&y=2)|(x=3&y=3);
 
-observable "up" = up;
 observable "right" = right;
 observable "down" = down;
 observable "left" = left;
+observable "act" = "act";
 
 const int x0_init = 0;
 const int y0_init = 0;
@@ -40,10 +40,10 @@ module maze
          y : [0..3];
          act:[0..4]; // 0: initial, 1: down, 2: up, 3: right, 4: left;
 
-        [up] !t & up    -> 0.9: (y'=yu) & (act'=2) + 0.1: (x'=xr) & (act' = 3);
-        [ri] !t & right -> 0.9: (x'=xr) & (act' = 3) + 0.1: (y'=yd) & (act' = 1);
-        [do] !t & down  -> 0.9: (y'=yd) & (act' = 1) + 0.1: (x'=xl) & (act' = 4);
-        [le] !t & left  -> 0.9: (x'=xl) & (act' = 4) + 0.1: (y'=yu) & (act' = 2);
+        [up] !t -> 0.9: (y'=yu) & (act' = 2) + 0.05: (x'=xr) & (act' = 3) + 0.05: (x'=xl) & (act' = 4);
+        [ri] !t -> 0.9: (x'=xr) & (act' = 3) + 0.05: (y'=yd) & (act' = 1) + 0.05: (y'=yd) & (act' = 1);
+        [do] !t -> 0.9: (y'=yd) & (act' = 1) + 0.05: (x'=xl) & (act' = 4) + 0.05: (y'=yu) & (act' = 2);
+        [le] !t -> 0.9: (x'=xl) & (act' = 4) + 0.05: (y'=yu) & (act' = 2) + 0.05: (y'=yd) & (act' = 1);
 endmodule
 
 init (((x=x0_init & y=y0_init) | (x=x1_init & y=y1_init)) & act=0) endinit

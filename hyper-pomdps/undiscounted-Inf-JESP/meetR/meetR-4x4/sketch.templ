@@ -15,7 +15,6 @@ formula down = (x=0&y=1)|(x=2&y=1)|(x=3&y=1)|(x=0&y=2)|(x=2&y=2)|(x=0&y=3)|(x=1&
 
 formula left = (x=1&y=0)|(x=3&y=0)|(x=1&y=1)|(x=3&y=1)|(x=1&y=2)|(x=2&y=2)|(x=3&y=2)|(x=3&y=3);
 
-observable "up" = up;
 observable "right" = right;
 observable "down" = down;
 observable "left" = left;
@@ -34,10 +33,10 @@ formula xl = left ? (x-1) : x;
 module maze
          x : [0..3];
          y : [0..3];
-        [up] up     -> 0.9: (y'=yu) + 0.1: (x'=xr);
-        [ri] right  -> 0.9: (x'=xr) + 0.1: (y'=yd);
-        [do] down   -> 0.9: (y'=yd) + 0.1: (x'=xl);
-        [le] left   -> 0.9: (x'=xl) + 0.1: (y'=yu);
+        [up] -> 0.9: (y'=yu) + 0.05: (x'=xr) + 0.05: (x'=xl);
+        [ri] -> 0.9: (x'=xr) + 0.05: (y'=yd) + 0.05: (y'=yd);
+        [do] -> 0.9: (y'=yd) + 0.05: (x'=xl) + 0.05: (y'=yu);
+        [le] -> 0.9: (x'=xl) + 0.05: (y'=yu) + 0.05: (y'=yd);
 endmodule
 
 init (((x=x0_init & y=y0_init) | (x=x1_init & y=y1_init))) endinit

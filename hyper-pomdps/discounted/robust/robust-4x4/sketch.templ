@@ -18,6 +18,7 @@ formula left = (x=1&y=0)|(x=3&y=0)|(x=1&y=1)|(x=3&y=1)|(x=1&y=2)|(x=2&y=2)|(x=3&
 observable "right" = right;
 observable "down" = down;
 observable "left" = left;
+observable "fail" = fail;
 
 const int x0_init = 0;
 const int y0_init = 0;
@@ -33,14 +34,16 @@ formula xl = left ? (x-1) : x;
 formula t0 = (x=2&y=1);
 formula t = (t0);
 
+
+& (fail'=true)
 module maze
          x : [0..3];
          y : [0..3];
          fail : bool;
-        [up] !sink & !t & up     -> 0.9: (y'=yu) + 0.1: (x'=xr) & (fail'=true);
-        [ri] !sink & !t & right  -> 0.9: (x'=xr) + 0.1: (y'=yd) & (fail'=true);
-        [do] !sink & !t & down   -> 0.9: (y'=yd) + 0.1: (x'=xl) & (fail'=true);
-        [le] !sink & !t & left   -> 0.9: (x'=xl) + 0.1: (y'=yu) & (fail'=true);
+        [up] !sink & !t -> 0.9: (y'=yu) + 0.05: (x'=xr) & (fail'=true) + 0.05: (x'=xl) & (fail'=true);
+        [ri] !sink & !t -> 0.9: (x'=xr) + 0.05: (y'=yd) & (fail'=true) + 0.05: (y'=yd) & (fail'=true);
+        [do] !sink & !t -> 0.9: (y'=yd) + 0.05: (x'=xl) & (fail'=true) + 0.05: (y'=yu) & (fail'=true);
+        [le] !sink & !t -> 0.9: (x'=xl) + 0.05: (y'=yu) & (fail'=true) + 0.05: (y'=yd) & (fail'=true);
 endmodule
 
 const double discount_factor = 0.98;

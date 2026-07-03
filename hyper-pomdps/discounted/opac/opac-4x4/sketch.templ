@@ -18,6 +18,7 @@ formula left = (x=1&y=0)|(x=3&y=0)|(x=1&y=1)|(x=3&y=1)|(x=1&y=2)|(x=2&y=2)|(x=3&
 observable "right" = right;
 observable "down" = down;
 observable "left" = left;
+observable "act" = act;
 
 const int x0_init = 0;
 const int y0_init = 0;
@@ -37,11 +38,10 @@ module maze
          x : [0..3];
          y : [0..3];
          act:[0..4]; // 0: initial, 1: down, 2: up, 3: right, 4: left;
-
-        [up] !sink & !t & up    -> 0.9: (y'=yu) & (act'=2) + 0.1: (x'=xr) & (act' = 3);
-        [ri] !sink & !t & right -> 0.9: (x'=xr) & (act' = 3) + 0.1: (y'=yd) & (act' = 1);
-        [do] !sink & !t & down  -> 0.9: (y'=yd) & (act' = 1) + 0.1: (x'=xl) & (act' = 4);
-        [le] !sink & !t & left  -> 0.9: (x'=xl) & (act' = 4) + 0.1: (y'=yu) & (act' = 2);
+        [up] !sink & !t -> 0.9: (y'=yu) & (act' = 2) + 0.05: (x'=xr) & (act' = 3) + 0.05: (x'=xl) & (act' = 4);
+        [ri] !sink & !t -> 0.9: (x'=xr) & (act' = 3) + 0.05: (y'=yd) & (act' = 1) + 0.05: (y'=yd) & (act' = 1);
+        [do] !sink & !t -> 0.9: (y'=yd) & (act' = 1) + 0.05: (x'=xl) & (act' = 4) + 0.05: (y'=yu) & (act' = 2);
+        [le] !sink & !t -> 0.9: (x'=xl) & (act' = 4) + 0.05: (y'=yu) & (act' = 2) + 0.05: (y'=yd) & (act' = 1);
 endmodule
 
 const double discount_factor = 0.98;

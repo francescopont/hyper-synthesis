@@ -19,13 +19,13 @@ observable "right" = right;
 observable "down" = down;
 observable "left" = left;
 observable "memory" = memory;
+observable "fail" = fail;
 
 const int x0_init = 0;
 const int y0_init = 0;
 
 const int x1_init = 0;
 const int y1_init = 3;
-
 
 formula yu = up ? (y+1) : y;
 formula xr = right ? (x+1) : x;
@@ -39,15 +39,14 @@ module maze
          x : [0..3];
          y : [0..3];
          fail : bool;
-        [up0] !sink & !t & up     -> 0.9: (y'=yu) + 0.1: (x'=xr) & (fail'=true);
-        [ri0] !sink & !t & right  -> 0.9: (x'=xr) + 0.1: (y'=yd) & (fail'=true);
-        [do0] !sink & !t & down   -> 0.9: (y'=yd) + 0.1: (x'=xl) & (fail'=true);
-        [le0] !sink & !t & left   -> 0.9: (x'=xl) + 0.1: (y'=yu) & (fail'=true);
-
-        [up1] !sink & !t & up     -> 0.9: (y'=yu) + 0.1: (x'=xr) & (fail'=true);
-        [ri1] !sink & !t & right  -> 0.9: (x'=xr) + 0.1: (y'=yd) & (fail'=true);
-        [do1] !sink & !t & down   -> 0.9: (y'=yd) + 0.1: (x'=xl) & (fail'=true);
-        [le1] !sink & !t & left   -> 0.9: (x'=xl) + 0.1: (y'=yu) & (fail'=true);
+        [up0] !sink & !t -> 0.9: (y'=yu) + 0.05: (x'=xr) & (fail'=true) + 0.05: (x'=xl) & (fail'=true);
+        [ri0] !sink & !t -> 0.9: (x'=xr) + 0.05: (y'=yd) & (fail'=true) + 0.05: (y'=yd) & (fail'=true);
+        [do0] !sink & !t -> 0.9: (y'=yd) + 0.05: (x'=xl) & (fail'=true) + 0.05: (y'=yu) & (fail'=true);
+        [le0] !sink & !t -> 0.9: (x'=xl) + 0.05: (y'=yu) & (fail'=true) + 0.05: (y'=yd) & (fail'=true);
+        [up1] !sink & !t -> 0.9: (y'=yu) + 0.05: (x'=xr) & (fail'=true) + 0.05: (x'=xl) & (fail'=true);
+        [ri1] !sink & !t -> 0.9: (x'=xr) + 0.05: (y'=yd) & (fail'=true) + 0.05: (y'=yd) & (fail'=true);
+        [do1] !sink & !t -> 0.9: (y'=yd) + 0.05: (x'=xl) & (fail'=true) + 0.05: (y'=yu) & (fail'=true);
+        [le1] !sink & !t -> 0.9: (x'=xl) + 0.05: (y'=yu) & (fail'=true) + 0.05: (y'=yd) & (fail'=true);
 endmodule
 
 const double discount_factor = 0.98;
