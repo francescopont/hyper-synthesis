@@ -507,7 +507,7 @@ class PrismHyperParser:
 
             self.composed_model = stormpy.storage.SparseMdp(components)
 
-    def refactor_specification(self, want_to_export):
+    def refactor_specification(self):
         # refactor formulae to have only reachability probabilities
         self.lines = []
         for index, property in enumerate(self.specification.stormpy_properties()):
@@ -548,10 +548,6 @@ class PrismHyperParser:
         # remove non-zipped model
         os.remove(file_name)
 
-        # some assertions for safety
-        assert self.composed_model.labeling.contains_label("target0")
-        assert not self.composed_model.labeling.contains_label("target1")
-
         if single_model.is_partially_observable:
             # refactor the state labeling: each agent gets observations, not the full information of the current state
             # the agent is the DRA, which always gets the same observation.
@@ -560,13 +556,14 @@ class PrismHyperParser:
                                                       self.product_id_to_state_tuple))
 
         with open(f"{sketch_folder}/helpers.json", "w") as file:
+            target_states = [state for state, targetFormulas in self.target_sets.items() if 0 in targetFormulas]
             helpers = {"state labeling": self.product_id_to_state_tuple,
-                       "target states": list(self.composed_model.labeling.get_states('target0')),
+                       "target states": target_states,
                        "choice labeling": self.choice_to_action_tuple}
 
             # accepting states of the full model
             logger.info(
-                f"Setting {len(list(self.composed_model.labeling.get_states('target0')))} target states while exporting.")
+                f"Setting {len(target_states)} target states while exporting.")
             json.dump(helpers, file)
 
         logger.info("hyperExport OK, aborting...")
@@ -644,7 +641,7 @@ class PrismHyperParser:
         # call STORM/SPOT construction of DRA
         self.build_cross_product(single_model, want_to_export, single_property)
 
-        self.refactor_specification(want_to_export)
+        self.refactor_specification()
         self.parse_specification(relative_error, discount_factor)
 
         # export the model, if required
