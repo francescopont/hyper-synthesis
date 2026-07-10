@@ -21,7 +21,7 @@ design_space_pattern = re.compile(r"synthesis initiated, design space: ([0-9]+)"
 nr_holes_pattern = re.compile(r"Current family has ([0-9]+) holes")
 
 
-def collect_results(path):
+def collect_results(path, filter):
     results = []
     if not os.path.isfile(path):
         raise ValueError(f"the log file {path} does not exist")
@@ -40,6 +40,9 @@ def collect_results(path):
             name_match = name_pattern.search(line)
             if name_match is not None:
                 name = name_match.group(2)
+                if "-4" in name:
+                    name = re.sub("-4", "-04", name)
+
 
             d_size_match = d_size_pattern.search(line)
             if d_size_match is not None:
@@ -91,7 +94,8 @@ def collect_results(path):
                     "time": time,
                     "opt": opt,
                 }
-                results.append(record)
+                if filter is None or filter in name:
+                    results.append(record)
                 name = None
                 d_size = None
                 time = time_out_symbol
@@ -115,7 +119,8 @@ def collect_results(path):
         "time": time,
         "opt": opt,
     }
-    results.append(record)
+    if filter is None or filter in name:
+        results.append(record)
     return results
 
 
@@ -131,10 +136,11 @@ def to_list(results, key_map_list):
 if __name__ == '__main__':
     argp = argparse.ArgumentParser()
     argp.add_argument('--input', type=str, help="Input Log file.")
+    argp.add_argument('--filter', default=None, type=str, help="Filtering string.")
     args = argp.parse_args()
 
     print(f'Collecting benchmark results...')
-    results = collect_results(args.input)
+    results = collect_results(args.input, args.filter)
 
     key_list = ['name', 'nr_states', 'nr_observations', 'nr_holes', 'design_space', 'bound', 'd_size', 'time', 'opt']
     results_matrix = to_list(results, list(map(lambda k: (k, lambda x: x), key_list)))

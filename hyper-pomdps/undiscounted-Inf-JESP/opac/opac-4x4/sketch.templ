@@ -40,10 +40,10 @@ module maze
          y : [0..3];
          act:[0..4]; // 0: initial, 1: down, 2: up, 3: right, 4: left;
 
-        [up] !t -> 0.9: (y'=yu) & (act' = 2) + 0.05: (x'=xr) & (act' = 3) + 0.05: (x'=xl) & (act' = 4);
-        [ri] !t -> 0.9: (x'=xr) & (act' = 3) + 0.05: (y'=yd) & (act' = 1) + 0.05: (y'=yd) & (act' = 1);
-        [do] !t -> 0.9: (y'=yd) & (act' = 1) + 0.05: (x'=xl) & (act' = 4) + 0.05: (y'=yu) & (act' = 2);
-        [le] !t -> 0.9: (x'=xl) & (act' = 4) + 0.05: (y'=yu) & (act' = 2) + 0.05: (y'=yd) & (act' = 1);
+        [up]  !t -> 0.9: (y'=yu) & (act' = 2) + 0.05: (x'=xr) & (act' = 3) + 0.05: (x'=xl) & (act' = 4);
+        [ri]  !t -> 0.9: (x'=xr) & (act' = 3) + 0.05: (y'=yd) & (act' = 1) + 0.05: (y'=yd) & (act' = 1);
+        [do]  !t -> 0.9: (y'=yd) & (act' = 1) + 0.05: (x'=xl) & (act' = 4) + 0.05: (y'=yu) & (act' = 2);
+        [le]  !t -> 0.9: (x'=xl) & (act' = 4) + 0.05: (y'=yu) & (act' = 2) + 0.05: (y'=yd) & (act' = 1);
 endmodule
 
 init (((x=x0_init & y=y0_init) | (x=x1_init & y=y1_init)) & act=0) endinit

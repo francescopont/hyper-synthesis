@@ -33,10 +33,10 @@ module maze
          x : [0..3];
          y : [0..3];
          fail : bool;
-        [up] !sink & !t & up     -> 0.9: (y'=yu) + 0.1: (x'=xr) & (fail'=true);
-        [ri] !sink & !t & right  -> 0.9: (x'=xr) + 0.1: (y'=yd) & (fail'=true);
-        [do] !sink & !t & down   -> 0.9: (y'=yd) + 0.1: (x'=xl) & (fail'=true);
-        [le] !sink & !t & left   -> 0.9: (x'=xl) + 0.1: (y'=yu) & (fail'=true);
+        [up] !sink & !t -> 0.9: (y'=yu) + 0.05: (x'=xr) & (fail'=true) + 0.05: (x'=xl) & (fail'=true);
+        [ri] !sink & !t -> 0.9: (x'=xr) + 0.05: (y'=yd) & (fail'=true) + 0.05: (y'=yd) & (fail'=true);
+        [do] !sink & !t -> 0.9: (y'=yd) + 0.05: (x'=xl) & (fail'=true) + 0.05: (y'=yu) & (fail'=true);
+        [le] !sink & !t -> 0.9: (x'=xl) + 0.05: (y'=yu) & (fail'=true) + 0.05: (y'=yd) & (fail'=true);
 endmodule
 
 const double discount_factor = 0.98;

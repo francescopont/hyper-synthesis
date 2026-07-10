@@ -29,10 +29,10 @@ formula xl = left ? (x-1) : x;
 module maze
          x : [0..3];
          y : [0..3];
-        [up] !sink & up   -> 0.9: (y'=yu) + 0.1: (x'=xr);
-        [ri] !sink & right  -> 0.9: (x'=xr) + 0.1: (y'=yd);
-        [do] !sink & down -> 0.9: (y'=yd) + 0.1: (x'=xl);
-        [le] !sink & left   -> 0.9: (x'=xl) + 0.1: (y'=yu);
+        [up] !sink -> 0.9: (y'=yu) + 0.05: (x'=xr) + 0.05: (x'=xl);
+        [ri] !sink -> 0.9: (x'=xr) + 0.05: (y'=yd) + 0.05: (y'=yd);
+        [do] !sink -> 0.9: (y'=yd) + 0.05: (x'=xl) + 0.05: (y'=yu);
+        [le] !sink -> 0.9: (x'=xl) + 0.05: (y'=yu) + 0.05: (y'=yd);
 endmodule
 
 const double discount_factor_up = 0.98;

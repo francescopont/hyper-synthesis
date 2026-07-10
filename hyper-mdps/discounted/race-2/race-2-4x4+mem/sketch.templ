@@ -33,14 +33,14 @@ formula t = (t0);
 module maze
          x : [0..3];
          y : [0..3];
-        [up0] !sink & !t & up   -> 0.9: (y'=yu) + 0.1: (x'=xr);
-        [ri0] !sink & !t & right   -> 0.9: (x'=xr) + 0.1: (y'=yd);
-        [do0] !sink & !t & down   -> 0.9: (y'=yd) + 0.1: (x'=xl);
-        [le0] !sink & !t & left   -> 0.9: (x'=xl) + 0.1: (y'=yu);
-        [up1] !sink & !t & up   -> 0.9: (y'=yu) + 0.1: (x'=xr);
-        [ri1] !sink & !t & right   -> 0.9: (x'=xr) + 0.1: (y'=yd);
-        [do1] !sink & !t & down   -> 0.9: (y'=yd) + 0.1: (x'=xl);
-        [le1] !sink & !t & left   -> 0.9: (x'=xl) + 0.1: (y'=yu);
+        [up0] !sink & !t -> 0.9: (y'=yu) + 0.05: (x'=xr) + 0.05: (x'=xl);
+        [ri0] !sink & !t -> 0.9: (x'=xr) + 0.05: (y'=yd) + 0.05: (y'=yd);
+        [do0] !sink & !t -> 0.9: (y'=yd) + 0.05: (x'=xl) + 0.05: (y'=yu);
+        [le0] !sink & !t -> 0.9: (x'=xl) + 0.05: (y'=yu) + 0.05: (y'=yd);
+        [up1] !sink & !t -> 0.9: (y'=yu) + 0.05: (x'=xr) + 0.05: (x'=xl);
+        [ri1] !sink & !t -> 0.9: (x'=xr) + 0.05: (y'=yd) + 0.05: (y'=yd);
+        [do1] !sink & !t -> 0.9: (y'=yd) + 0.05: (x'=xl) + 0.05: (y'=yu);
+        [le1] !sink & !t -> 0.9: (x'=xl) + 0.05: (y'=yu) + 0.05: (y'=yd);
 endmodule
 
 const double discount_factor = 0.98;
