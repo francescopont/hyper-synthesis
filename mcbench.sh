@@ -24,7 +24,7 @@ if [ -n "$4" ]; then
 fi
 
 # default parameters
-timeout=3600
+timeout=7200
 
 # workspace settings
 SYNTHESIS=`pwd`
