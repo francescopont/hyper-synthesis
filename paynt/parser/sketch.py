@@ -133,8 +133,8 @@ class Sketch:
         paynt.verification.property.Property.initialize()
         
         make_rewards_action_based(explicit_quotient)
-        logger.debug("constructed explicit quotient having {} states and {} actions".format(
-            explicit_quotient.nr_states, explicit_quotient.nr_choices))
+        logger.debug("constructed explicit quotient having {} states, {} actions, and {} transitions.".format(
+            explicit_quotient.nr_states, explicit_quotient.nr_choices, explicit_quotient.nr_transitions))
 
         specification.check()
         if specification.contains_until_properties() and filetype != "prism":
