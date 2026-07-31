@@ -10,12 +10,12 @@ import os
 #
 time_out_symbol = "dagger"  # default
 name_pattern = re.compile(r"loading sketch from (.*)/(\S+)/sketch.templ")
-d_size_pattern = re.compile(r"constructed explicit quotient having ([0-9]+) states")
+d_size_pattern = re.compile(r"constructed explicit quotient having ([0-9]+) states, ([0-9]+) actions, and ([0-9]+) transitions.")
 time_pattern = re.compile(r"synthesis time: ([0-9]+\.[0-9]+) s\n")
 optimum_pattern = re.compile(r"optimum: ([0-9]+\.[0-9]+)\n")
 progress_pattern = re.compile(r"> progress(.*) opt = ([0-9]+\.[0-9]+)\n")
 start_pattern = re.compile(r"cli.py - This is Paynt version 0.1.0")
-nr_states_pattern = re.compile(r"initial states and ([0-9]+) states")
+nr_states_pattern = re.compile(r"The original \(non self-composed\) model has [0-9]+ initial states, ([0-9]+) states, ([0-9]+) actions, ([0-9]+) transitions.")
 nr_observations_pattern = re.compile(r"Number of observations of the input model: ([0-9]+)")
 bound_pattern = re.compile(r"Bound on the maximum achievable value function: ([0-9]+\.[0-9]+)")
 design_space_pattern = re.compile(r"synthesis initiated, design space: ([0-9]+)")
@@ -29,6 +29,8 @@ def collect_results(path, filter):
     with open(path) as file:
         name = None
         d_size = None
+        d_nr_actions = None
+        d_nr_transitions = None
         time = time_out_symbol
         opt = -1
         nr_states = None
@@ -48,6 +50,8 @@ def collect_results(path, filter):
             d_size_match = d_size_pattern.search(line)
             if d_size_match is not None:
                 d_size = d_size_match.group(1)
+                d_nr_actions = d_size_match.group(2)
+                d_nr_transitions = d_size_match.group(3)
 
             time_match = time_pattern.search(line)
             if time_match is not None:
@@ -92,6 +96,8 @@ def collect_results(path, filter):
                     "design_space": design_space,
                     "bound": bound,
                     "d_size": d_size,
+                    "d_nr_actions": d_nr_actions,
+                    "d_nr_transitions": d_nr_transitions,
                     "time": time,
                     "opt": opt,
                 }
@@ -99,6 +105,8 @@ def collect_results(path, filter):
                     results.append(record)
                 name = None
                 d_size = None
+                d_nr_actions = None
+                d_nr_transitions = None
                 time = time_out_symbol
                 opt = -1
                 nr_states = 0
@@ -117,6 +125,8 @@ def collect_results(path, filter):
         "design_space": design_space,
         "bound": bound,
         "d_size": d_size,
+        "d_nr_actions": d_nr_actions,
+        "d_nr_transitions": d_nr_transitions,
         "time": time,
         "opt": opt,
     }
@@ -143,9 +153,9 @@ if __name__ == '__main__':
     print(f'Collecting benchmark results...')
     results = collect_results(args.input, args.filter)
 
-    key_list = ['name', 'nr_states', 'nr_observations', 'nr_holes', 'design_space', 'bound', 'd_size', 'time', 'opt']
+    key_list = ['name', 'nr_states', 'nr_observations', 'nr_holes', 'design_space', 'bound', 'd_size', 'd_nr_actions', 'd_nr_transitions', 'time', 'opt']
     results_matrix = to_list(results, list(map(lambda k: (k, lambda x: x), key_list)))
-    header = ["Name", "|M|", "|O|", "|H|", "|DS|", "b", "|D|", "t", "opt"]
+    header = ["Name", "|M|", "|O|", "|H|", "|DS|", "b", "|D|", "|Act|", "|trans|", "t", "opt"]
 
     # store results somewhere
     base = os.path.splitext(args.input)[0]
