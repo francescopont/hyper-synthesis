@@ -17,6 +17,7 @@ if __name__ == '__main__':
 
     path = args.input
     name = args.dir
+    opt = None
     if not os.path.isfile(path):
         raise ValueError(f"the log file {path} does not exist")
     with FileReadBackwards(path, encoding="utf-8") as file:
@@ -34,14 +35,15 @@ if __name__ == '__main__':
                 #raise Exception(f"Cannot find the optimum: {line}")
 
     # propagate optimum
-    memfolders = [f"{name}+mem", f"{name}XX"]
-    for memfolder in memfolders:
-        if os.path.isdir(memfolder):
-            output_path = f"{memfolder}/opt-temp.txt"
-            with open(output_path, 'w', newline='') as f:
-                f.write(opt)
-        else:
-            pass
-            # print(f"Do not propagate to experiment {memfolder}")
+    if opt is not None:
+        memfolders = [f"{name}+mem", f"{name}XX"]
+        for memfolder in memfolders:
+            if os.path.isdir(memfolder):
+                output_path = f"{memfolder}/opt-temp.txt"
+                with open(output_path, 'w', newline='') as f:
+                    f.write(opt)
+            else:
+                pass
+                # print(f"Do not propagate to experiment {memfolder}")
 
 
