@@ -614,7 +614,7 @@ class PrismHyperParser:
         nr_transitions = single_model.nr_transitions
 
         logger.info(
-            f"The original (non self-composed) model has {nr_initial_states} initial states, {nr_states} states, {nr_actions} actions, {nr_transitions} transitions.")
+            f"The original (non self-composed) model has {nr_initial_states} initial states and {nr_states} states, {nr_actions} actions, {nr_transitions} transitions.")
         if single_model.is_partially_observable:
             logger.info(f"The original (non self-composed) model is a POMDP!")
 
