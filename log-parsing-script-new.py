@@ -11,11 +11,12 @@ import os
 time_out_symbol = "dagger"  # default
 name_pattern = re.compile(r"loading sketch from (.*)/(\S+)/sketch.templ")
 d_size_pattern = re.compile(r"constructed explicit quotient having ([0-9]+) states, ([0-9]+) actions, and ([0-9]+) transitions.")
+d_size_pattern_old = re.compile(r"constructed explicit quotient having ([0-9]+) states")
 time_pattern = re.compile(r"synthesis time: ([0-9]+\.[0-9]+) s\n")
 optimum_pattern = re.compile(r"optimum: ([0-9]+\.[0-9]+)\n")
 progress_pattern = re.compile(r"> progress(.*) opt = ([0-9]+\.[0-9]+)\n")
 start_pattern = re.compile(r"cli.py - This is Paynt version 0.1.0")
-nr_states_pattern = re.compile(r"The original \(non self-composed\) model has [0-9]+ initial states and ([0-9]+) states, ([0-9]+) actions, ([0-9]+) transitions.")
+nr_states_pattern = re.compile(r"The original \(non self-composed\) model has [0-9]+ initial states and ([0-9]+) states")
 nr_observations_pattern = re.compile(r"Number of observations of the input model: ([0-9]+)")
 bound_pattern = re.compile(r"Bound on the maximum achievable value function: ([0-9]+\.[0-9]+)")
 design_space_pattern = re.compile(r"synthesis initiated, design space: ([0-9]+)")
@@ -49,9 +50,12 @@ def collect_results(path, filter):
 
             d_size_match = d_size_pattern.search(line)
             if d_size_match is not None:
-                d_size = d_size_match.group(1)
                 d_nr_actions = d_size_match.group(2)
                 d_nr_transitions = d_size_match.group(3)
+
+            d_size_match_old = d_size_pattern_old.search(line)
+            if d_size_match_old is not None:
+                d_size = d_size_match_old.group(1)
 
             time_match = time_pattern.search(line)
             if time_match is not None:
