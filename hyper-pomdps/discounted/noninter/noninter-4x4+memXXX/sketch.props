@@ -1,4 +1,0 @@
-ES sched0 ES sched1 ES sched2
-A s0A(sched0) A s0B(sched0) A s1A(sched1) A s1B(sched2)
-Restrict s0A start0 Restrict s0B start0 Restrict s1A start1 Restrict s1B start1
-Pmax=? [ ((!"goals0A" U "goals1A") & !(!"goals0B" U "goals1B")) | ((!"goals0B" U "goals1B") & !(!"goals0A" U "goals1A"))]
