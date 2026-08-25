@@ -36,7 +36,7 @@ if __name__ == '__main__':
 
     # propagate optimum
     if opt is not None:
-        memfolders = [f"{name}+mem", f"{name}XX"]
+        memfolders = [f"{name}+mem", f"{name}XX", f"{name}X"]
         for memfolder in memfolders:
             if os.path.isdir(memfolder):
                 output_path = f"{memfolder}/opt-temp.txt"
